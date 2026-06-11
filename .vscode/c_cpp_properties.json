@@ -1,0 +1,65 @@
+{
+  "configurations": [
+    {
+      "name": "ESP-IDF",
+      "compilerPath": "C:\\Espressif\\tools\\riscv32-esp-elf\\esp-14.2.0_20260121\\riscv32-esp-elf\\bin\\riscv32-esp-elf-gcc.exe",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "intelliSenseMode": "gcc-x64",
+      "cStandard": "c11",
+      "includePath": [
+        "${workspaceFolder}/build/config",
+        "${workspaceFolder}/main",
+        "C:/esp/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/include",
+        "C:/esp/v5.5.4/esp-idf/components/freertos/esp_additions/freertos/include",
+        "C:/esp/v5.5.4/esp-idf/components/freertos/include",
+        "C:/esp/v5.5.4/esp-idf/components/freertos/include/esp_additions",
+        "C:/esp/v5.5.4/esp-idf/components/esp_system/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_wifi/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_event/include",
+        "C:/esp/v5.5.4/esp-idf/components/log/include",
+        "C:/esp/v5.5.4/esp-idf/components/nvs_flash/include",
+        "C:/esp/v5.5.4/esp-idf/components/mqtt/esp-mqtt/include",
+        "C:/esp/v5.5.4/esp-idf/components/app_update/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_http_client/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_https_ota/include",
+        "C:/esp/v5.5.4/esp-idf/components/json/cJSON",
+        "C:/esp/v5.5.4/esp-idf/components/driver/include",
+        "C:/esp/v5.5.4/esp-idf/components/driver/esp32/include",
+        "C:/esp/v5.5.4/esp-idf/components/hal/include",
+        "C:/esp/v5.5.4/esp-idf/components/hal/esp32/include",
+        "C:/esp/v5.5.4/esp-idf/components/hal/platform_port/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_http_server/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_timer/include",
+        "C:/esp/v5.5.4/esp-idf/components/lwip/include",
+        "C:/esp/v5.5.4/esp-idf/components/lwip/lwip/src/include",
+        "C:/esp/v5.5.4/esp-idf/components/lwip/port/esp32/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_netif/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_common/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_hw_support/include",
+        "C:/esp/v5.5.4/esp-idf/components/newlib/platform_include",
+        "C:/esp/v5.5.4/esp-idf/components/heap/include",
+        "C:/esp/v5.5.4/esp-idf/components/soc/include",
+        "C:/esp/v5.5.4/esp-idf/components/soc/esp32/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_rom/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_partition/include",
+        "C:/esp/v5.5.4/esp-idf/components/vfs/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_bootloader_format/include",
+        "C:/esp/v5.5.4/esp-idf/components/spi_flash/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_driver_gpio/include",
+        "C:/esp/v5.5.4/esp-idf/components/esp_driver_uart/include",
+        "C:/esp/v5.5.4/esp-idf/components/tcp_transport/include",
+        "C:/esp/v5.5.4/esp-idf/components/mbedtls/mbedtls/include",
+        "C:/esp/v5.5.4/esp-idf/components/mbedtls/port/include",
+        "C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/xtensa-esp-elf/include"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}",
+          "C:/esp/v5.5.4/esp-idf/components"
+        ],
+        "limitSymbolsToIncludedHeaders": false
+      }
+    }
+  ],
+  "version": 4
+}

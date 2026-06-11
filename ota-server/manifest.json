@@ -1,0 +1,11 @@
+{
+  "versions": [],
+  "latest": {
+    "version": "v1.0.0",
+    "path": "latest/firmware.bin",
+    "size": 0,
+    "sha256": "",
+    "timestamp": "2026-05-08T14:21:00",
+    "changelog": "初始版本 - 请上传实际固件文�?
+  }
+}

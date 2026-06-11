@@ -1,0 +1,29 @@
+# Byte-compiled
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+ota.log
+
+# Firmware files (keep directory, remove bins)
+firmware/*.bin
+firmware/*/
+firmware/latest/
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# MQTT credentials (if stored locally)
+mqtt_creds.json

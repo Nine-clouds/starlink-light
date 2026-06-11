@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP OTA 管理面板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .header .subtitle {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .status-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .status-item {
+            margin-bottom: 12px;
+        }
+        
+        .status-label {
+            color: #666;
+            font-size: 14px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .status-value {
+            color: #333;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .status-value.success {
+            color: #28a745;
+        }
+        
+        .status-value.warning {
+            color: #ffc107;
+        }
+        
+        .tabs {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            background: #f8f9fa;
+            padding: 10px;
+            gap: 10px;
+        }
+        
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            color: #667eea;
+            font-size: 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-content {
+            padding: 30px;
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .firmware-list {
+            margin-top: 20px;
+        }
+        
+        .firmware-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .firmware-info h4 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .firmware-meta {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .firmware-actions button {
+            padding: 8px 16px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn-download {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+        
+        .upload-form {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        
+        .form-group input[type="text"],
+        .form-group input[type="file"],
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .log-line {
+            margin-bottom: 8px;
+        }
+        
+        .log-line.info {
+            color: #4ec9b0;
+        }
+        
+        .log-line.error {
+            color: #f48771;
+        }
+        
+        .log-line.warning {
+            color: #dcdcaa;
+        }
+        
+        .api-doc {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .api-doc h4 {
+            color: #667eea;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .api-doc .endpoint {
+            background: #28a745;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        
+        .api-doc .description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: #333;
+            color: white;
+            border-radius: 10px;
+            display: none;
+            animation: slideIn 0.3s;
+        }
+        
+        .toast.success {
+            background: #28a745;
+        }
+        
+        .toast.error {
+            background: #dc3545;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .badge.success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .badge.latest {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔄 HTTP OTA 管理面板</h1>
+            <div class="subtitle">固件版本管理与分发系�?| <span id="server-url"></span></div>
+        </div>
+        
+        <!-- Status Grid -->
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>📊 服务器状�?/h3>
+                <div class="status-item">
+                    <span class="status-label">运行状�?/span>
+                    <span class="status-value success" id="server-status">�?运行�?/span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">端口</span>
+                    <span class="status-value" id="server-port">15678</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">启动时间</span>
+                    <span class="status-value" id="server-uptime">-</span>
+                </div>
+            </div>
+            
+            <div class="status-card">
+                <h3>📦 固件信息</h3>
+                <div class="status-item">
+                    <span class="status-label">最新版�?/span>
+                    <span class="status-value" id="latest-version">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">版本总数</span>
+                    <span class="status-value" id="version-count">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">固件大小</span>
+                    <span class="status-value" id="firmware-size">-</span>
+                </div>
+            </div>
+            
+            <div class="status-card">
+                <h3>📈 统计数据</h3>
+                <div class="status-item">
+                    <span class="status-label">下载次数</span>
+                    <span class="status-value" id="download-count">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">活跃设备</span>
+                    <span class="status-value" id="active-devices">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">最后下�?/span>
+                    <span class="status-value" id="last-download">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="showTab('firmware')">📦 固件管理</button>
+                <button class="tab-btn" onclick="showTab('mqtt')">🔔 MQTT推�?/button>
+                <button class="tab-btn" onclick="showTab('upload')">⬆️ 上传固件</button>
+                <button class="tab-btn" onclick="showTab('logs')">📋 日志查看</button>
+                <button class="tab-btn" onclick="showTab('api')">📖 API文档</button>
+                <button class="tab-btn" onclick="showTab('config')">⚙️ 配置</button>
+            </div>
+            
+            <!-- Firmware Management -->
+            <div class="tab-content active" id="firmware-tab">
+                <h2>固件版本列表</h2>
+                <div id="firmware-list" class="firmware-list">
+                    <div class="loading">正在加载固件列表</div>
+                </div>
+            </div>
+            
+            <!-- MQTT Push Control -->
+            <div class="tab-content" id="mqtt-tab">
+                <h2>🔔 MQTT主动推送升�?/h2>
+                
+                <div class="status-card" style="margin-bottom: 20px;">
+                    <h3>📡 MQTT连接状�?/h3>
+                    <div class="status-item">
+                        <span class="status-label">连接状�?/span>
+                        <span class="status-value" id="mqtt-status">�?未连�?/span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Broker地址</span>
+                        <span class="status-value">your-mqtt-broker:port</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">在线设备</span>
+                        <span class="status-value" id="mqtt-devices">-</span>
+                    </div>
+                </div>
+                
+                <div class="status-card" style="margin-bottom: 20px;">
+                    <h3>🚀 推送升级指�?/h3>
+                    <div class="upload-form">
+                        <div class="form-group">
+                            <label>推送目�?/label>
+                            <select id="push-target" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px;">
+                                <option value="all">所有设�?/option>
+                                <option value="device_001">device_001</option>
+                                <option value="device_002">device_002</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>升级版本</label>
+                            <input type="text" id="push-version" placeholder="留空使用最新版�?>
+                        </div>
+                        <div class="form-group">
+                            <label>推送说�?/label>
+                            <textarea id="push-message" rows="3" placeholder="推送说明（可选）"></textarea>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-primary" onclick="pushUpgrade()" style="flex: 1;">
+                                🔔 推送升级指�?                            </button>
+                            <button class="btn-primary" onclick="refreshMQTTStatus()" style="flex: 0.5; background: #28a745;">
+                                🔄 刷新状�?                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="status-card">
+                    <h3>📱 在线设备列表</h3>
+                    <div id="mqtt-device-list" style="margin-top: 15px;">
+                        <p style="color: #666;">暂无在线设备</p>
+                    </div>
+                </div>
+                
+                <div class="api-doc" style="margin-top: 20px;">
+                    <h4>💡 MQTT推送原�?/h4>
+                    <div class="description">
+                        <strong>工作流程�?/strong><br>
+                        1. 点击"推送升级指�?按钮<br>
+                        2. 服务器通过MQTT发布升级消息<br>
+                        3. ESP32订阅MQTT主题，收到消�?br>
+                        4. ESP32立即检查并下载更新<br>
+                        5. 无需等待定期检查，即时升级�?                    </div>
+                    <div class="description" style="margin-top: 10px;">
+                        <strong>主题�?/strong><br>
+                        - 升级指令: <code style="background: #1e1e1e; padding: 5px; border-radius: 3px; color: #d4d4d4;">ota/upgrade/command</code><br>
+                        - 设备状�? <code style="background: #1e1e1e; padding: 5px; border-radius: 3px; color: #d4d4d4;">ota/device/status</code><br>
+                        - 升级响应: <code style="background: #1e1e1e; padding: 5px; border-radius: 3px; color: #d4d4d4;">ota/upgrade/response</code>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Upload Firmware -->
+            <div class="tab-content" id="upload-tab">
+                <h2>上传新固�?/h2>
+                <div class="upload-form">
+                    <div class="form-group">
+                        <label>版本�?*</label>
+                        <input type="text" id="version-input" placeholder="例如: v1.1.0" required>
+                    </div>
+                    <div class="form-group">
+                        <label>固件文件 *</label>
+                        <input type="file" id="firmware-file" accept=".bin" required>
+                    </div>
+                    <div class="form-group">
+                        <label>更新说明</label>
+                        <textarea id="changelog-input" rows="4" placeholder="描述此版本的更新内容..."></textarea>
+                    </div>
+                    <button class="btn-primary" onclick="uploadFirmware()">⬆️ 上传固件</button>
+                </div>
+            </div>
+            
+            <!-- Logs -->
+            <div class="tab-content" id="logs-tab">
+                <h2>运行日志</h2>
+                <div class="log-container" id="log-container">
+                    <div class="loading">正在加载日志</div>
+                </div>
+                <button class="btn-primary" onclick="refreshLogs()" style="margin-top: 20px;">🔄 刷新日志</button>
+            </div>
+            
+            <!-- API Documentation -->
+            <div class="tab-content" id="api-tab">
+                <h2>API接口文档</h2>
+                
+                <div class="api-doc">
+                    <h4>版本查询</h4>
+                    <div class="endpoint">GET /api/version</div>
+                    <div class="description">获取最新固件版本信�?/div>
+                    <pre style="background: #1e1e1e; padding: 10px; border-radius: 5px; color: #d4d4d4;">
+{
+  "version": "v1.0.0",
+  "url": "/firmware/latest/firmware.bin",
+  "size": 1024,
+  "sha256": "...",
+  "timestamp": "..."
+}</pre>
+                </div>
+                
+                <div class="api-doc">
+                    <h4>版本清单</h4>
+                    <div class="endpoint">GET /api/manifest</div>
+                    <div class="description">获取所有固件版本列�?/div>
+                </div>
+                
+                <div class="api-doc">
+                    <h4>服务器状�?/h4>
+                    <div class="endpoint">GET /api/status</div>
+                    <div class="description">获取服务器运行状态和配置信息</div>
+                </div>
+                
+                <div class="api-doc">
+                    <h4>固件下载</h4>
+                    <div class="endpoint">GET /firmware/latest/firmware.bin</div>
+                    <div class="endpoint">GET /firmware/v1.0.0/firmware.bin</div>
+                    <div class="description">下载最新或指定版本的固件文件，支持Range请求（断点续传）</div>
+                </div>
+                
+                <div class="api-doc">
+                    <h4>设备端使用示�?/h4>
+                    <div class="description">Python客户端检查更新：</div>
+                    <pre style="background: #1e1e1e; padding: 10px; border-radius: 5px; color: #d4d4d4;">
+python3 device_client.py \
+  --server http://your-server-ip:15678 \
+  --version v1.0.0 \
+  --check</pre>
+                </div>
+            </div>
+            
+            <!-- Configuration -->
+            <div class="tab-content" id="config-tab">
+                <h2>服务器配�?/h2>
+                <div id="config-display" class="loading">正在加载配置</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+    
+    <script>
+        const API_BASE = window.location.origin;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('server-url').textContent = API_BASE;
+            refreshAll();
+            setInterval(refreshAll, 30000); // Auto refresh every 30s
+        });
+        
+        // Tab switching
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabId + '-tab').classList.add('active');
+            
+            // Refresh content when tab is shown
+            if (tabId === 'logs') refreshLogs();
+            if (tabId === 'config') refreshConfig();
+        }
+        
+        // Refresh all data
+        async function refreshAll() {
+            await Promise.all([
+                refreshStatus(),
+                refreshFirmwareList()
+            ]);
+        }
+        
+        // Fetch API helper
+        async function fetchAPI(endpoint) {
+            try {
+                const response = await fetch(API_BASE + endpoint);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                return null;
+            }
+        }
+        
+        // Refresh server status
+        async function refreshStatus() {
+            const status = await fetchAPI('/api/status');
+            if (status) {
+                document.getElementById('server-port').textContent = status.config.server.port;
+                document.getElementById('server-uptime').textContent = status.uptime;
+                document.getElementById('firmware-count').textContent = status.firmware_count || 0;
+            }
+            
+            const version = await fetchAPI('/api/version');
+            if (version) {
+                document.getElementById('latest-version').textContent = version.version;
+                document.getElementById('firmware-size').textContent = formatBytes(version.size);
+                document.getElementById('version-count').textContent = version.size > 0 ? '1+' : '0';
+            }
+        }
+        
+        // Refresh firmware list
+        async function refreshFirmwareList() {
+            const manifest = await fetchAPI('/api/manifest');
+            const container = document.getElementById('firmware-list');
+            
+            if (!manifest || !manifest.versions || manifest.versions.length === 0) {
+                container.innerHTML = '<p style="color: #666; padding: 20px;">暂无固件版本</p>';
+                return;
+            }
+            
+            container.innerHTML = manifest.versions.map(v => `
+                <div class="firmware-item">
+                    <div class="firmware-info">
+                        <h4>${v.version} ${v.version === manifest.latest?.version ? '<span class="badge latest">最�?/span>' : ''}</h4>
+                        <div class="firmware-meta">
+                            <strong>大小:</strong> ${formatBytes(v.size)} | 
+                            <strong>时间:</strong> ${v.timestamp} |
+                            <strong>SHA256:</strong> ${v.sha256.substring(0, 16)}...
+                        </div>
+                        ${v.changelog ? `<div class="firmware-meta" style="margin-top: 8px;"><strong>说明:</strong> ${v.changelog}</div>` : ''}
+                    </div>
+                    <div class="firmware-actions">
+                        <button class="btn-download" onclick="downloadFirmware('${v.version}')">⬇️ 下载</button>
+                        <button class="btn-delete" onclick="deleteFirmware('${v.version}')">🗑�?删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Refresh logs
+        async function refreshLogs() {
+            showToast('正在加载日志...', 'info');
+            
+            try {
+                const response = await fetch(API_BASE + '/api/logs?lines=50');
+                const result = await response.json();
+                
+                const container = document.getElementById('log-container');
+                
+                if (result.success && result.logs) {
+                    let html = '';
+                    
+                    result.logs.forEach(log => {
+                        const level = log.level || 'INFO';
+                        const levelClass = level.toLowerCase();
+                        const message = log.message || log.raw || '';
+                        const timestamp = log.timestamp || '';
+                        
+                        html += `<div class="log-line ${levelClass}">`;
+                        if (timestamp) {
+                            html += `[${timestamp}] `;
+                        }
+                        html += `${level} - ${message}</div>`;
+                    });
+                    
+                    container.innerHTML = html;
+                    showToast(`�?已加�?${result.count} 条日志`, 'success');
+                    
+                } else {
+                    container.innerHTML = '<div class="log-line warning">暂无日志</div>';
+                }
+                
+            } catch (error) {
+                showToast('加载日志失败', 'error');
+                console.error('Logs error:', error);
+                document.getElementById('log-container').innerHTML = 
+                    '<div class="log-line error">日志加载失败，请刷新页面</div>';
+            }
+        }
+        
+        // Refresh configuration
+        async function refreshConfig() {
+            const status = await fetchAPI('/api/status');
+            const container = document.getElementById('config-display');
+            
+            if (status && status.config) {
+                container.innerHTML = `
+                    <pre style="background: #1e1e1e; padding: 20px; border-radius: 10px; color: #d4d4d4; overflow-x: auto;">
+${JSON.stringify(status.config, null, 2)}
+                    </pre>
+                `;
+            } else {
+                container.innerHTML = '<p style="color: #666;">配置加载失败</p>';
+            }
+        }
+        
+        // Upload firmware
+        async function uploadFirmware() {
+            const version = document.getElementById('version-input').value;
+            const fileInput = document.getElementById('firmware-file');
+            const changelog = document.getElementById('changelog-input').value;
+            
+            if (!version || !fileInput.files[0]) {
+                showToast('请填写版本号并选择文件', 'error');
+                return;
+            }
+            
+            showToast('正在上传固件...', 'info');
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                formData.append('version', version);
+                formData.append('changelog', changelog);
+                
+                const response = await fetch(API_BASE + '/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(`�?上传成功！版�? ${version}`, 'success');
+                    // 刷新固件列表
+                    setTimeout(() => {
+                        refreshFirmwareList();
+                        showToast(`固件大小: ${formatBytes(result.size)}`, 'info');
+                    }, 1000);
+                } else {
+                    showToast(`上传失败: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                showToast('上传失败，请检查文件格�?, 'error');
+                console.error('Upload error:', error);
+            }
+        }
+        
+        // MQTT Push Functions
+        async function pushUpgrade() {
+            const target = document.getElementById('push-target').value;
+            const version = document.getElementById('push-version').value;
+            const message = document.getElementById('push-message').value;
+            
+            showToast('正在推送升级指�?..', 'info');
+            
+            try {
+                const response = await fetch(API_BASE + '/api/mqtt/push', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        target: target,
+                        version: version || null,
+                        message: message
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showToast('�?升级指令已推送成功！', 'success');
+                    
+                    // 显示推送详�?                    setTimeout(() => {
+                        showToast(`目标: ${target}, 版本: ${result.version}`, 'info');
+                    }, 2000);
+                } else {
+                    showToast(`推送失�? ${result.message}`, 'error');
+                }
+                
+            } catch (error) {
+                showToast('MQTT推送功能需要安装paho-mqtt�?, 'warning');
+                console.error('Push error:', error);
+            }
+        }
+        
+        async function refreshMQTTStatus() {
+            try {
+                const response = await fetch(API_BASE + '/api/mqtt/status');
+                const status = await response.json();
+                
+                if (status.connected) {
+                    document.getElementById('mqtt-status').textContent = '�?已连�?;
+                    document.getElementById('mqtt-status').className = 'status-value success';
+                    document.getElementById('mqtt-devices').textContent = status.device_count;
+                    
+                    // 更新设备列表
+                    if (status.devices && status.devices.length > 0) {
+                        let html = status.devices.map(device => `
+                            <div class="firmware-item">
+                                <div class="firmware-info">
+                                    <h4>${device.id}</h4>
+                                    <div class="firmware-meta">
+                                        <strong>版本:</strong> ${device.version} |
+                                        <strong>状�?</strong> ${device.status} |
+                                        <strong>最后上�?</strong> ${device.last_seen}
+                                    </div>
+                                </div>
+                                <div class="firmware-actions">
+                                    <button class="btn-download" onclick="pushToDevice('${device.id}')">
+                                        🔔 推送升�?                                    </button>
+                                </div>
+                            </div>
+                        `).join('');
+                        document.getElementById('mqtt-device-list').innerHTML = html;
+                    } else {
+                        document.getElementById('mqtt-device-list').innerHTML = '<p style="color: #666;">暂无在线设备</p>';
+                    }
+                    
+                    showToast('MQTT状态已更新', 'success');
+                } else {
+                    document.getElementById('mqtt-status').textContent = '�?未连�?;
+                    document.getElementById('mqtt-status').className = 'status-value warning';
+                    showToast('MQTT服务器未连接', 'warning');
+                }
+                
+            } catch (error) {
+                showToast('MQTT功能未启用，请安装paho-mqtt', 'warning');
+                document.getElementById('mqtt-status').textContent = '�?未配�?;
+                console.error('MQTT status error:', error);
+            }
+        }
+        
+        async function pushToDevice(deviceId) {
+            document.getElementById('push-target').value = deviceId;
+            await pushUpgrade();
+        }
+        
+        // Download firmware
+        function downloadFirmware(version) {
+            const url = `${API_BASE}/firmware/${version}/firmware.bin`;
+            window.open(url, '_blank');
+            showToast(`开始下�?${version}`, 'success');
+        }
+        
+        // Delete firmware
+        async function deleteFirmware(version) {
+            if (!confirm(`确定要删除版�?${version}？`)) return;
+            
+            showToast('正在删除...', 'info');
+            
+            try {
+                const response = await fetch(API_BASE + '/api/delete?version=' + version);
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(`�?版本 ${version} 已删除`, 'success');
+                    // 刷新固件列表
+                    setTimeout(() => {
+                        refreshFirmwareList();
+                    }, 500);
+                } else {
+                    showToast(`删除失败: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                showToast('删除失败，请重试', 'error');
+                console.error('Delete error:', error);
+            }
+        }
+        
+        // Toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.style.display = 'block';
+            
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Format bytes to human readable
+        function formatBytes(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>

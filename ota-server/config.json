@@ -1,0 +1,29 @@
+{
+  "server": {
+    "port": 15678,
+    "host": "0.0.0.0",
+    "name": "HTTP OTA Server"
+  },
+  "firmware": {
+    "directory": "firmware",
+    "max_versions": 10,
+    "auto_cleanup": false
+  },
+  "security": {
+    "require_token": false,
+    "token": "",
+    "https_enabled": false,
+    "cert_file": "",
+    "key_file": ""
+  },
+  "logging": {
+    "log_downloads": true,
+    "log_file": "ota.log",
+    "log_level": "INFO"
+  },
+  "device": {
+    "check_interval": 3600,
+    "download_timeout": 300,
+    "max_retries": 3
+  }
+}

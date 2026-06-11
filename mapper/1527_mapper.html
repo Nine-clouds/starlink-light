@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1527 遥控器映射管�?/title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a28;
+    --border: rgba(255,255,255,0.08);
+    --accent: #6366f1;
+    --accent-glow: rgba(99,102,241,0.4);
+    --accent2: #818cf8;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --success: #22c55e;
+    --success-glow: rgba(34,197,94,0.3);
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --radius: 16px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; }
+  body {
+    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    background-image: 
+      radial-gradient(ellipse 80% 60% at 20% 20%, rgba(99,102,241,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(129,140,248,0.05) 0%, transparent 50%);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .header-icon {
+    width: 64px; height: 64px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    margin: 0 auto 16px;
+    box-shadow: 0 0 32px var(--accent-glow);
+  }
+  h1 { font-size: 1.5rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .subtitle { color: var(--text-muted); font-size: 0.8rem; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 100%;
+    max-width: 680px;
+    box-shadow: var(--shadow);
+  }
+  .status-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+  }
+  .status-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border-radius: 50px;
+    padding: 8px 16px; font-size: 0.82rem;
+    border: 1px solid var(--border);
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--danger);
+    transition: all 0.3s;
+  }
+  .status-dot.connected {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success-glow);
+  }
+  .status-dot.connecting {
+    background: var(--warning);
+    animation: blink 1s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    padding: 9px 18px; border: none; border-radius: 10px;
+    font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 28px var(--accent-glow); }
+  .btn-outline {
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover { background: rgba(255,255,255,0.06); transform: translateY(-1px); }
+  .btn-danger {
+    background: rgba(239,68,68,0.15); color: var(--danger);
+    border: 1px solid rgba(239,68,68,0.3);
+  }
+  .btn-danger:hover { background: rgba(239,68,68,0.25); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .section-title {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 12px;
+  }
+  .add-form {
+    display: flex; gap: 8px; align-items: flex-end;
+    margin-bottom: 20px; flex-wrap: wrap;
+    padding: 16px;
+    background: var(--surface2);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 80px; }
+  .field label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .field input {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); padding: 8px;
+    font-family: 'Courier New', monospace; font-size: 0.9rem;
+    text-align: center; text-transform: uppercase; width: 100%;
+    transition: border-color 0.2s; outline: none;
+  }
+  .field input:focus { border-color: var(--accent); background: rgba(99,102,241,0.05); }
+  .field input.error { border-color: var(--danger); background: rgba(239,68,68,0.05); }
+  .field input::placeholder { color: #475569; }
+  .table-wrap {
+    border-radius: 12px; border: 1px solid var(--border);
+    max-height: 380px; overflow-y: auto; margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .table-wrap::-webkit-scrollbar { width: 4px; }
+  .table-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { position: sticky; top: 0; z-index: 1; }
+  th {
+    background: rgba(99,102,241,0.15); color: var(--accent2);
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 12px 16px; text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 10px 16px; text-align: center; font-family: 'Courier New', monospace; font-size: 0.88rem; }
+  tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
+  tr:last-child { border-bottom: none; }
+  tr:hover { background: rgba(255,255,255,0.03); }
+  .hex-cell { color: var(--accent2); letter-spacing: 0.05em; }
+  .row-num { color: var(--text-muted); font-size: 0.75rem; }
+  .del-btn {
+    background: transparent; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1rem; padding: 4px 8px; border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .del-btn:hover { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .row-count {
+    text-align: right; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px;
+  }
+  .info-bar {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;
+    padding: 12px 16px; background: var(--surface2);
+    border-radius: 10px; border: 1px solid var(--border);
+    font-size: 0.72rem; color: var(--text-muted);
+  }
+  .info-bar span { display: flex; align-items: center; gap: 4px; }
+  .info-bar strong { color: var(--accent2); font-family: 'Courier New', monospace; }
+  .toast {
+    position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-100px);
+    background: var(--surface); backdrop-filter: blur(20px);
+    border-radius: 12px; padding: 12px 24px; font-size: 0.88rem;
+    z-index: 9999; transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid var(--border);
+    white-space: nowrap; pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { color: var(--success); border-color: rgba(34,197,94,0.4); }
+  .toast.error { color: var(--danger); border-color: rgba(239,68,68,0.4); }
+  .toast.info { color: var(--warning); border-color: rgba(245,158,11,0.4); }
+  @media (max-width: 560px) {
+    .card { padding: 16px; }
+    .field { min-width: 70px; }
+    .btn { padding: 8px 14px; font-size: 0.78rem; }
+    h1 { font-size: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">📟</div>
+  <h1>1527 遥控器映射管�?/h1>
+  <div class="subtitle">ESP32 网关 · MQTT 双向同步</div>
+</div>
+
+<div class="card">
+  <div class="status-row">
+    <div class="status-badge">
+      <div class="status-dot" id="dot"></div>
+      <span id="connStatus">连接�?..</span>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="sendMap()">📤 发送映射表</button>
+      <button class="btn btn-outline" onclick="getMap()">📥 读取</button>
+    </div>
+  </div>
+
+  <div class="add-form">
+    <div class="field">
+      <label>rf_addr</label>
+      <input id="addRfAddr" maxlength="4" placeholder="682D" oninput="validateHex(this,4)">
+    </div>
+    <div class="field">
+      <label>rf_key</label>
+      <input id="addRfKey" maxlength="2" placeholder="34" oninput="validateHex(this,2)">
+    </div>
+    <div class="field">
+      <label>dev_addr</label>
+      <input id="addDevAddr" maxlength="2" placeholder="01" oninput="validateHex(this,2)">
+    </div>
+    <button class="btn btn-primary" onclick="addRow()">添加</button>
+  </div>
+
+  <div class="row-count" id="rowCount">�?0 条映�?/div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:48px">#</th>
+          <th>rf_addr</th>
+          <th>rf_key</th>
+          <th>dev_addr</th>
+          <th style="width:56px">操作</th>
+        </tr>
+      </thead>
+      <tbody id="mapBody"></tbody>
+    </table>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-danger" onclick="clearAll()">🗑 清空所�?/button>
+    <button class="btn btn-outline" onclick="loadDemo()">📋 加载示例</button>
+  </div>
+
+  <div class="info-bar">
+    <span>📡发布 <strong>home/gateway/1527map</strong></span>
+    <span>📨订阅 <strong>home/gateway/1527map_resp</strong></span>
+    <span>💾本地存储 · 最�?2�?/span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let mapData = [];
+
+const DEFAULTS = [
+  { rf_addr:'682D', rf_key:'34', dev_addr:'01' },
+  { rf_addr:'682D', rf_key:'32', dev_addr:'01' },
+  { rf_addr:'08FB', rf_key:'D8', dev_addr:'01' },
+  { rf_addr:'682D', rf_key:'36', dev_addr:'01' },
+];
+
+function validateHex(el, max) {
+  el.value = el.value.replace(/[^0-9A-Fa-f]/g,'').toUpperCase().slice(0,max);
+  el.classList.remove('error');
+}
+
+function load() {
+  try {
+    const s = localStorage.getItem('1527_map');
+    mapData = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULTS));
+  } catch { mapData = JSON.parse(JSON.stringify(DEFAULTS)); }
+  if (!localStorage.getItem('1527_map')) save();
+  render();
+}
+
+function save() { localStorage.setItem('1527_map', JSON.stringify(mapData)); }
+
+function render() {
+  const tb = document.getElementById('mapBody');
+  tb.innerHTML = '';
+  if (!mapData.length) {
+    tb.innerHTML = '<tr><td colspan="5" style="padding:32px;color:#475569;font-size:0.85rem">暂无映射数据，点击下方加载示�?/td></tr>';
+    document.getElementById('rowCount').textContent = '�?0 �?;
+    return;
+  }
+  mapData.forEach((r,i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="row-num">${i+1}</td>
+      <td class="hex-cell"><input value="${r.rf_addr}" maxlength="4" style="width:72px;text-align:center;font-family:monospace;font-size:0.88rem;background:transparent;border:none;color:#818cf8;text-transform:uppercase;outline:none"
+        onchange="update(${i},'rf_addr',this.value)"></td>
+      <td class="hex-cell"><input value="${r.rf_key}" maxlength="2" style="width:56px;text-align:center;font-family:monospace;font-size:0.88rem;background:transparent;border:none;color:#818cf8;text-transform:uppercase;outline:none"
+        onchange="update(${i},'rf_key',this.value)"></td>
+      <td class="hex-cell"><input value="${r.dev_addr}" maxlength="2" style="width:56px;text-align:center;font-family:monospace;font-size:0.88rem;background:transparent;border:none;color:#818cf8;text-transform:uppercase;outline:none"
+        onchange="update(${i},'dev_addr',this.value)"></td>
+      <td><button class="del-btn" onclick="del(${i})">�?/button></td>
+    `;
+    tb.appendChild(tr);
+  });
+  document.getElementById('rowCount').textContent = `�?${mapData.length} 条`;
+}
+
+function update(i,k,v) {
+  v = v.replace(/[^0-9A-Fa-f]/g,'').toUpperCase();
+  if (mapData[i]) { mapData[i][k] = v; save(); }
+}
+
+function addRow() {
+  const [a,b,c] = ['addRfAddr','addRfKey','addDevAddr'].map(id => document.getElementById(id).value.trim());
+  let err = false;
+  [['addRfAddr',/^[0-9A-Fa-f]{4}$/],['addRfKey',/^[0-9A-Fa-f]{2}$/],['addDevAddr',/^[0-9A-Fa-f]{2}$/]].forEach(([id,re]) => {
+    if (!re.test(document.getElementById(id).value)) { document.getElementById(id).classList.add('error'); err = true; }
+  });
+  if (err) { toast('请检查输入格�?,'error'); return; }
+  if (mapData.length >= 32) { toast('最�?2�?,'error'); return; }
+  mapData.push({ rf_addr:a.toUpperCase(), rf_key:b.toUpperCase(), dev_addr:c.toUpperCase() });
+  save(); render();
+  [a,b,c].forEach(id => document.getElementById(id === a ? 'addRfAddr' : id === b ? 'addRfKey' : 'addDevAddr').value = '');
+  toast('已添�?,'success');
+}
+
+function del(i) { mapData.splice(i,1); save(); render(); }
+
+function clearAll() {
+  if (!mapData.length) return;
+  if (!confirm('确定清空所有映射？')) return;
+  mapData = []; save(); render();
+  toast('已清�?,'info');
+}
+
+function loadDemo() {
+  mapData = JSON.parse(JSON.stringify(DEFAULTS)); save(); render();
+  toast('已加载示�?,'success');
+}
+
+function sendMap() {
+  if (!mapData.length) { toast('映射表为�?,'error'); return; }
+  fetch(`${API}/api/send`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ cmd:'set_map', data: mapData })
+  }).then(r=>r.json()).then(res => {
+    toast(res.success ? `已发�?${mapData.length} �?✅` : '发送失�?,'success');
+  }).catch(() => toast('发送失�?,'error'));
+}
+
+function getMap() {
+  fetch(`${API}/api/load`).then(r=>r.json()).then(res => {
+    toast(res.success ? '已发送读取请�?..' : '读取失败','info');
+  }).catch(() => toast('读取失败','error'));
+}
+
+function setStatus(s) {
+  const dot = document.getElementById('dot');
+  const txt = document.getElementById('connStatus');
+  dot.className = 'status-dot ' + s;
+  txt.textContent = s === 'connected' ? 'MQTT 已连�? : s === 'connecting' ? '连接�?..' : '已断开';
+}
+
+function toast(msg,type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type + ' show';
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function checkStatus() {
+  fetch(`${API}/api/status`).then(r=>r.json()).then(res => {
+    setStatus(res.mqtt_connected ? 'connected' : 'disconnected');
+  }).catch(() => setStatus('disconnected'));
+}
+
+let es = null;
+function startSSE() {
+  es = new EventSource(`${API}/api/subscribe`);
+  es.onopen = () => setStatus('connected');
+  es.onmessage = e => {
+    try {
+      const m = JSON.parse(e.data);
+      if (m.type === 'response' && m.data && Array.isArray(m.data.data)) {
+        mapData = m.data.data.map(r => ({
+          rf_addr: (r.rf_addr||'').toString().toUpperCase(),
+          rf_key: (r.rf_key||'').toString().toUpperCase(),
+          dev_addr: (r.dev_addr||'').toString().toUpperCase()
+        }));
+        save(); render();
+        toast(`已更�?${mapData.length} �?(来自ESP32)`,'success');
+      }
+    } catch {}
+  };
+  es.onerror = () => { setStatus('disconnected'); es.close(); setTimeout(startSSE, 5000); };
+}
+
+load();
+checkStatus();
+startSSE();
+</script>
+</body>
+</html>
