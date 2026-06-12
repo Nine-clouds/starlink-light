@@ -104,9 +104,14 @@ idf.py flash
 2. 编译，烧录到 STC15W4K32S4
 
 **STC8H 从机（Keil C51）×6：**
-1. 打开 `slave/starlink-slave.uvproj`
-2. 修改 `DEVICE_ADDR` 为 0x01~0x06（每个房间不同）
-3. 编译，烧录到每个从机板
+1. Keil 编译一次 `slave/starlink-slave.uvproj`（DEVICE_ADDR 任意值）
+2. 用烧录工具自动改地址批量烧录：
+   ```bash
+   python3 tools/slave_flasher_gui.py   # GUI 版
+   # 或直接双击 tools/STC8H_Burn_Tool.exe
+   # 或命令行：python3 tools/slave_flasher.py slave/xxx.hex --flash COM3
+   ```
+> 手动方式：修改 `DEVICE_ADDR` 逐一编译烧录，见 `slave/README.md`
 
 ### 第二步：部署服务端
 
