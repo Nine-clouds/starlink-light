@@ -207,7 +207,7 @@ static void dns_task(void *pvParameters)
     setsockopt(dns_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     if (bind(dns_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        ESP_LOGE(TAG, "DNS: bind失败 (errno=%d)", errno");
+        ESP_LOGE(TAG, "DNS: bind失败 (errno=%d)", errno);
         close(dns_sock);
         dns_sock = -1;
         dns_running = false;
@@ -215,7 +215,7 @@ static void dns_task(void *pvParameters)
         return;
     }
 
-    ESP_LOGI(TAG, "DNS劫持服务器已启动 (所有域?-> 192.168.4.1)");
+    ESP_LOGI(TAG, "DNS劫持服务器已启动 (所有域?-> 192.168.4.1));
 
     // AP ?IP 地址 192.168.4.1
     uint8_t ap_ip[4] = {192, 168, 4, 1};
@@ -548,7 +548,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     const char *ssid = ssid_item->valuestring;
     const char *password = (pass_item && cJSON_IsString(pass_item)) ? pass_item->valuestring : "";
 
-    ESP_LOGI(TAG, "收到WiFi配置: SSID=%s", ssid");
+    ESP_LOGI(TAG, "收到WiFi配置: SSID=%s", ssid);
 
     esp_err_t err = save_wifi_credentials(ssid, password);
     cJSON_Delete(root);
@@ -576,7 +576,7 @@ static esp_err_t config_scan_handler(httpd_req_t *req)
         .scan_time.active = { .min = 60, .max = 100 },  // 每信息0~100ms，快速扫?    };
     esp_err_t err = esp_wifi_scan_start(&scan_config, true);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "WiFi扫描失败: %s", esp_err_to_name(err)");
+        ESP_LOGE(TAG, "WiFi扫描失败: %s", esp_err_to_name(err));
         httpd_resp_set_type(req, "application/json");
         httpd_resp_send(req, "[]", 2);
         return ESP_OK;
@@ -653,7 +653,7 @@ static httpd_handle_t start_config_server(void)
     // 启动 DNS 劫持服务
 dns_server_start();
 
-    ESP_LOGI(TAG, "HTTP配置服务?DNS已启?(Captive Portal)");
+    ESP_LOGI(TAG, "HTTP配置服务?DNS已启?(Captive Portal));
     return server;
 }
 
@@ -683,10 +683,10 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             wifi_connected = false;
             if (provisioning_active) break;  // 已在配网模式，忽略断连事?            s_retry_num++;
             if (s_retry_num <= WIFI_MAX_RETRY) {
-                ESP_LOGI(TAG, "WiFi重连接.. (%d/%d)", s_retry_num, WIFI_MAX_RETRY");
+                ESP_LOGI(TAG, "WiFi重连接.. (%d/%d)", s_retry_num, WIFI_MAX_RETRY);
                 esp_wifi_connect();
             } else if (!ap_attempted) {
-                ESP_LOGW(TAG, "WiFi连接失败%d次，启动配网模式(%ds)", WIFI_MAX_RETRY, PROVISIONING_TIMEOUT_S");
+                ESP_LOGW(TAG, "WiFi连接失败%d次，启动配网模式(%ds)", WIFI_MAX_RETRY, PROVISIONING_TIMEOUT_S);
                 ap_attempted = true;
                 need_provisioning = true;
             } else {
@@ -700,7 +700,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "WiFi已关联到AP");
             break;
         case WIFI_EVENT_AP_START:
-            ESP_LOGI(TAG, "配网AP已启? %s", AP_SSID");
+            ESP_LOGI(TAG, "配网AP已启? %s", AP_SSID);
             // 手动设置 DHCP 服务器的 DNS 选项，让客户端使?192.168.4.1 作为 DNS
             // （CONFIG_LWIP_DHCPS_ADD_DNS=n 阻止了内置DNS，需要手动通告?            {
                 esp_netif_t *ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
@@ -791,7 +791,7 @@ static void start_provisioning(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &sta_blank));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "请连接WiFi '%s'（密? %s）并访问 http://192.168.4.1 进行配网", AP_SSID, AP_PASSWORD");
+    ESP_LOGI(TAG, "请连接WiFi '%s'（密? %s）并访问 http://192.168.4.1 进行配网", AP_SSID, AP_PASSWORD);
 }
 
 // AP配网60秒超时?关闭AP，切换为STA模式重连WiFi
@@ -812,7 +812,7 @@ if (provisioning_timer) {
         return;
     }
 
-    ESP_LOGI(TAG, "配网窗口结束，切换到STA模式连接: %s", ssid");
+    ESP_LOGI(TAG, "配网窗口结束，切换到STA模式连接: %s", ssid);
 
     // 停止 HTTP/DNS 服务
 stop_config_server();
@@ -879,10 +879,10 @@ static void wifi_init(void)
         ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
         ESP_ERROR_CHECK(esp_wifi_start());
 
-        ESP_LOGI(TAG, "尝试连接WiFi: %s", ssid");
+        ESP_LOGI(TAG, "尝试连接WiFi: %s", ssid);
     } else {
         // 无凭据：开AP配网（常驻）
-        ESP_LOGI(TAG, "无WiFi凭据，启动配网模式);
+        ESP_LOGI(TAG, "无WiFi凭据，启动配网模式");
         start_provisioning();
     }
 }
@@ -924,7 +924,7 @@ static void publish_device_info(void)
     esp_mqtt_client_publish(mqtt_client, "ota/device/status", json, 0, 1, 1);
     cJSON_free(json);
     cJSON_Delete(root);
-    ESP_LOGI(TAG, "已上报设备信息);
+    ESP_LOGI(TAG, "已上报设备信息");
 }
 
 static void send_auto_discovery_all(void)
@@ -965,7 +965,7 @@ static void send_auto_discovery_all(void)
         cJSON_free(json);
         cJSON_Delete(config);
     }
-    ESP_LOGI(TAG, "已发送自动发现配置);
+    ESP_LOGI(TAG, "已发送自动发现配置");
 }
 
 static void send_log_sensor_discovery(void)
@@ -1003,7 +1003,7 @@ static void subscribe_all(void)
     esp_mqtt_client_subscribe(mqtt_client, "home/gateway/cmd", 0);
     esp_mqtt_client_subscribe(mqtt_client, "home/gateway/1527map", 0);
     esp_mqtt_client_subscribe(mqtt_client, "ota/upgrade/command", 0);
-    ESP_LOGI(TAG, "已订阅所有主题);
+    ESP_LOGI(TAG, "已订阅所有主题");
 }
 
 static void handle_gateway_command(const char *payload, int len)
@@ -1068,7 +1068,7 @@ static void stc15_send_map_set(const uint8_t *entries, int count)
     free(frame);
 
     // SET_MAP不设置map_echo_pending，只有GET_MAP才会回传映射表数
-ESP_LOGI(TAG, "STC15W <-- 映射?(%d?", count");
+ESP_LOGI(TAG, "STC15W <-- 映射?(%d?", count);
 }
 
 // 发布映射表到MQTT (响应Web端读取请
@@ -1098,7 +1098,7 @@ static void publish_1527map_resp(const uint8_t *entries, int count)
     cJSON_free(json);
     cJSON_Delete(root);
 
-    ESP_LOGI(TAG, "已发布映射表到MQTT (%d?", count");
+    ESP_LOGI(TAG, "已发布映射表到MQTT (%d?", count);
 }
 
 // 处理Web端发来的1527映射表命?static void handle_1527map_command(const char *payload, int len)
@@ -1125,7 +1125,7 @@ static void publish_1527map_resp(const uint8_t *entries, int count)
         int count = cJSON_GetArraySize(data);
         if (count <= 0 || count > MAP_MAX_ENTRIES) {
             cJSON_Delete(root);
-            ESP_LOGW(TAG, "1527map: 条数无效 (%d)", count");
+            ESP_LOGW(TAG, "1527map: 条数无效 (%d)", count);
             return;
         }
 
@@ -1150,7 +1150,7 @@ static void publish_1527map_resp(const uint8_t *entries, int count)
             if (sscanf(addr_item->valuestring, "%04X", &addr_val) != 1 ||
                 sscanf(key_item->valuestring, "%02X", &key_val) != 1 ||
                 sscanf(dev_item->valuestring, "%02X", &dev_val) != 1) {
-                ESP_LOGW(TAG, "1527map: ?d条hex解析失败", i");
+                ESP_LOGW(TAG, "1527map: ?d条hex解析失败", i);
                 parse_ok = false;
                 break;
             }
@@ -1172,7 +1172,7 @@ static void publish_1527map_resp(const uint8_t *entries, int count)
         // 请求STC15回传映射?        stc15_send_frame(ADDR_BROADCAST, CMD_GET_MAP);
         map_echo_pending = true;
         map_echo_sent_us = esp_timer_get_time();
-        ESP_LOGI(TAG, "已请求STC15回传映射?);
+        ESP_LOGI(TAG, "已请求STC15回传映射?");
     }
 
     cJSON_Delete(root);
@@ -1216,7 +1216,7 @@ static void handle_ota_command(const char *payload, int len)
     }
 
     cJSON_Delete(root);
-    ESP_LOGI(TAG, "OTA升级: %s -> %s", CURRENT_VERSION, version");
+    ESP_LOGI(TAG, "OTA升级: %s -> %s", CURRENT_VERSION, version);
     start_ota_update(url);
 }
 
@@ -1270,7 +1270,7 @@ static void mqtt_event_handler(void *arg, esp_event_base_t event_base,
     in_mqtt_context = true;
     switch (event_id) {
     case MQTT_EVENT_CONNECTED:
-        ESP_LOGI(TAG, "MQTT已连接);
+        ESP_LOGI(TAG, "MQTT已连接");
         mqtt_connected = true;
         mqtt_connect_time_us = esp_timer_get_time();
         last_heartbeat_us = esp_timer_get_time();  // 上报过设备信息，心跳重新计时
@@ -1455,7 +1455,7 @@ static void stc15_send_frame(uint8_t addr, uint8_t cmd)
         cmd_name = cmd_names_high[cmd - 0xA0];
     else
         cmd_name = "???";
-    ESP_LOGD(TAG, "STC15W <-- 10 18 %02X %02X 18 10  (%s)", addr, cmd, cmd_name");
+    ESP_LOGD(TAG, "STC15W <-- 10 18 %02X %02X 18 10  (%s)", addr, cmd, cmd_name);
 }
 
 static void stc15_process_rx(void)
@@ -1483,7 +1483,7 @@ if (esp_timer_get_time() - map_rx_start_us > 200000) {
                 if (map_rx_count == 0) {
                     map_rx_state = MAP_RX_TAIL1;
                 } else if (map_rx_count > MAP_MAX_ENTRIES) {
-                    ESP_LOGW(TAG, "映射表条数超时 %d", map_rx_count");
+                    ESP_LOGW(TAG, "映射表条数超时 %d", map_rx_count);
                     map_rx_state = MAP_RX_IDLE;
                     rx_state = RX_IDLE;  // 重置普通帧状态机，防止后续字节误?                } else {
                     map_rx_state = MAP_RX_DATA;
@@ -1499,16 +1499,16 @@ if (esp_timer_get_time() - map_rx_start_us > 200000) {
                 if (dat == FRAME_TAIL1) {
                     map_rx_state = MAP_RX_TAIL2;
                 } else {
-                    ESP_LOGW(TAG, "映射表帧TAIL1不匹? %02X", dat");
+                    ESP_LOGW(TAG, "映射表帧TAIL1不匹? %02X", dat);
                     map_rx_state = MAP_RX_IDLE;
                 }
                 break;
             case MAP_RX_TAIL2:
                 if (dat == FRAME_TAIL2) {
-                    ESP_LOGI(TAG, "STC15W --> 映射表回?(%d?", map_rx_count");
+                    ESP_LOGI(TAG, "STC15W --> 映射表回?(%d?", map_rx_count);
                     publish_1527map_resp(map_rx_buf, map_rx_count);
                 } else {
-                    ESP_LOGW(TAG, "映射表帧TAIL2不匹? %02X", dat");
+                    ESP_LOGW(TAG, "映射表帧TAIL2不匹? %02X", dat);
                 }
                 map_rx_state = MAP_RX_IDLE;
                 map_echo_pending = false;
@@ -1590,7 +1590,7 @@ if (rx_state != RX_IDLE) {
                         }
                     }
                 } else {
-                    ESP_LOGD(TAG, "STC15W --> 10 18 %02X %02X 18 10  (6字节?", rx_addr, rx_cmd");
+                    ESP_LOGD(TAG, "STC15W --> 10 18 %02X %02X 18 10  (6字节?", rx_addr, rx_cmd);
                 }
             }
             rx_state = RX_IDLE;
@@ -1610,8 +1610,8 @@ static void ota_task(void *pvParameter)
 
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "开始OTA升级...");
-    ESP_LOGI(TAG, "当前版本: %s", CURRENT_VERSION");
-    ESP_LOGI(TAG, "目标固件: %s", url");
+    ESP_LOGI(TAG, "当前版本: %s", CURRENT_VERSION);
+    ESP_LOGI(TAG, "目标固件: %s", url);
     ESP_LOGI(TAG, "========================================");
 
     // 重新配置看门狗为60秒超时，OTA下载可能耗时较长
@@ -1642,7 +1642,7 @@ static void ota_task(void *pvParameter)
         ESP_LOGI(TAG, "OTA成功，重启中...");
         esp_restart();
     } else {
-        ESP_LOGE(TAG, "OTA失败: %s", esp_err_to_name(ret)");
+        ESP_LOGE(TAG, "OTA失败: %s", esp_err_to_name(ret));
         ESP_LOGI(TAG, "继续运行当前版本");
     }
 
@@ -1696,7 +1696,7 @@ wifi_init();
     esp_err_t wdt_ret = esp_task_wdt_init(&wdt_config);
     if (wdt_ret == ESP_OK) {
         ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
-        ESP_LOGI(TAG, "看门狗已启用 (%ds)", WDT_TIMEOUT_S");
+        ESP_LOGI(TAG, "看门狗已启用 (%ds)", WDT_TIMEOUT_S);
     } else {
         ESP_LOGW(TAG, "看门狗初始化失败: %s，跳过, esp_err_to_name(wdt_ret));
     }
@@ -1704,9 +1704,9 @@ wifi_init();
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "星联灯控 SL-GW1");
     ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "设备ID: %s", DEVICE_ID");
-    ESP_LOGI(TAG, "当前版本: %s", CURRENT_VERSION");
-    ESP_LOGI(TAG, "MQTT: %s", MQTT_BROKER_URI");
+    ESP_LOGI(TAG, "设备ID: %s", DEVICE_ID);
+    ESP_LOGI(TAG, "当前版本: %s", CURRENT_VERSION);
+    ESP_LOGI(TAG, "MQTT: %s", MQTT_BROKER_URI);
     ESP_LOGI(TAG, "========================================");
 
     // 注册日志重定向：WARN/ERROR 同时?MQTT
@@ -1812,7 +1812,7 @@ if (query_pending && mqtt_connected) {
         // 映射表回传等待超时保护（STC15处理+回传?00ms，预?00ms
 if (map_echo_pending && (esp_timer_get_time() - map_echo_sent_us > 500000)) {
             map_echo_pending = false;
-            ESP_LOGW(TAG, "映射表回传等待超时);
+            ESP_LOGW(TAG, "映射表回传等待超时");
         }
 
         // 心跳上报
