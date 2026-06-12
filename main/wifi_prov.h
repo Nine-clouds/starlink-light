@@ -1,7 +1,7 @@
 /**
- * WiFi Provisioning Module
+ * WiFi配网模块
  *
- * Handles WiFi provisioning, AP mode, HTTP config server, DNS hijacking
+ * 负责: WiFi连接、AP配网、HTTP配置页、DNS劫持、NVS凭据存储
  */
 
 #ifndef WIFI_PROV_H

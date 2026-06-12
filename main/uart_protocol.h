@@ -1,8 +1,8 @@
 /**
- * UART Protocol Module - STC15W Communication
+ * UART协议模块 - STC15W通信
  *
- * Handles UART communication with STC15W microcontroller
- * Frame format: 10 18 [ADDR] [CMD] [DATA] 18 10
+ * 帧格式: 10 18 [ADDR] [CMD] [DATA] 18 10
+ * 波特率: 9600, TX:GPIO7, RX:GPIO6
  */
 
 #ifndef UART_PROTOCOL_H

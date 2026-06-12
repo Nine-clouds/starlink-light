@@ -1,7 +1,13 @@
 /**
- * MQTT & Home Assistant Module
+ * MQTT & Home Assistant 模块
  *
- * Handles MQTT client, HA auto-discovery, command handling
+ * 负责:
+ *   - MQTT客户端生命周期（连接/断开/重连）
+ *   - Home Assistant自动发现配置下发
+ *   - 房间状态上报与命令接收
+ *   - 1527映射表管理（下发/读取）
+ *   - OTA远程升级
+ *   - 日志拦截：WARN/ERROR自动发MQTT，MQTT上下文内用环形缓冲延迟发送避免重入
  */
 
 #include <stdio.h>
@@ -10,8 +16,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "esp_mqtt.h"
+#include "mqtt_client.h"
 #include "cJSON.h"
+#include "esp_netif.h"
+#include "esp_https_ota.h"
+#include "esp_task_wdt.h"
 #include "mqtt_ha.h"
 #include "gateway_state.h"
 #include "uart_protocol.h"
@@ -19,7 +28,11 @@
 
 static const char *TAG = "mqtt_ha";
 
-// ==================== MQTT Log Upload ====================
+// ==================== MQTT日志上报 ====================
+// 机制: 通过esp_log_set_vprintf()拦截所有日志
+//   - WARN/ERROR级别 → 发送到MQTT日志topic
+//   - MQTT上下文内 → 写入环形缓冲，事件处理结束后延迟发送（避免重入）
+//   - 非MQTT上下文 → 直接发送
 #define LOG_BUF_SIZE        256
 #define LOG_RING_COUNT      8
 static vprintf_like_t s_original_vprintf = NULL;
@@ -27,6 +40,10 @@ static char log_ring[LOG_RING_COUNT][LOG_BUF_SIZE];
 static volatile int log_ring_head = 0;
 static volatile int log_ring_count = 0;
 
+/**
+ * 刷新环形缓冲中的延迟日志
+ * 在MQTT事件处理结束后调用，将缓冲区中的日志一次性发送
+ */
 static void flush_log_buffer(void)
 {
     if (!mqtt_client || !mqtt_connected) {
@@ -40,6 +57,10 @@ static void flush_log_buffer(void)
     }
 }
 
+/**
+ * 日志拦截回调 - 替代默认vprintf
+ * WARN/ERROR级别日志额外发送到MQTT，MQTT上下文内用环形缓冲延迟发送
+ */
 static int mqtt_log_vprintf(const char *fmt, va_list args)
 {
     va_list args_copy;
@@ -85,7 +106,17 @@ static int mqtt_log_vprintf(const char *fmt, va_list args)
     return ret;
 }
 
-// ==================== MQTT Event Handler ====================
+/**
+ * 初始化MQTT日志拦截
+ * 注册vprintf钩子，保存原始vprintf用于串口输出
+ */
+void mqtt_log_init(void)
+{
+    s_original_vprintf = esp_log_set_vprintf(mqtt_log_vprintf);
+    ESP_LOGI(TAG, "MQTT log interception enabled");
+}
+
+// ==================== MQTT事件处理 ====================
 
 void mqtt_event_handler(void *arg, esp_event_base_t event_base,
                        int32_t event_id, void *event_data)
@@ -154,7 +185,7 @@ void mqtt_app_start(void)
     ESP_LOGI(TAG, "MQTT client started");
 }
 
-// ==================== MQTT Message Handlers ====================
+// ==================== MQTT消息处理 ====================
 
 void handle_mqtt_message(esp_mqtt_event_handle_t event)
 {
@@ -310,7 +341,7 @@ void subscribe_all(void)
     ESP_LOGI(TAG, "Subscribed to all topics");
 }
 
-// ==================== Command Handlers ====================
+// ==================== 命令处理 ====================
 
 void handle_gateway_command(const char *payload, int len)
 {
@@ -343,7 +374,7 @@ void handle_gateway_command(const char *payload, int len)
     }
 }
 
-// ==================== 1527 Mapping Table ====================
+// ==================== 1527映射表 ====================
 
 void stc15_send_map_set(const uint8_t *entries, int count)
 {
@@ -474,7 +505,7 @@ void handle_1527map_command(const char *payload, int len)
     cJSON_Delete(root);
 }
 
-// ==================== OTA Update ====================
+// ==================== OTA远程升级 ====================
 
 static void ota_task(void *pvParameter)
 {

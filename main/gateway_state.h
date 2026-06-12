@@ -1,8 +1,12 @@
 /**
- * Gateway State - Shared state variables across modules
+ * 网关全局状态 - 跨模块共享变量
  *
- * This file declares global state variables that need to be accessed
- * by multiple modules (uart_protocol, wifi_prov, mqtt_ha, etc.)
+ * 声明所有需要跨模块访问的状态变量:
+ *   - 房间配置（ID、名称、实体ID）
+ *   - MQTT/WiFi连接状态
+ *   - 配网状态
+ *   - 查询队列状态
+ *   - 定时参数宏定义
  */
 
 #ifndef GATEWAY_STATE_H
@@ -10,7 +14,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "mqtt_client.h"
+#include "esp_http_server.h"
+#include "esp_timer.h"
 
 // ==================== Room Configuration ====================
 #define ROOM_COUNT         6

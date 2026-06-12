@@ -1,7 +1,13 @@
 /**
- * WiFi Provisioning Module
+ * WiFi配网模块
  *
- * Handles WiFi provisioning, AP mode, HTTP config server, DNS hijacking
+ * 负责:
+ *   - WiFi STA/AP模式切换
+ *   - 智能连网：有凭据直连，连不上5次弹AP；无凭据直接AP
+ *   - AP配网页面（Captive Portal）：DNS劫持 + HTTP配置页
+ *   - WiFi扫描结果返回给前端
+ *   - NVS存储WiFi凭据
+ *   - 配网超时后自动切回STA模式
  */
 
 #include <stdio.h>
@@ -21,6 +27,7 @@
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
 #include "esp_timer.h"
+#include "cJSON.h"
 #include "wifi_prov.h"
 #include "gateway_state.h"
 #include "mqtt_ha.h"
@@ -28,7 +35,8 @@
 
 static const char *TAG = "wifi_prov";
 
-// ==================== DNS Hijack Service (Captive Portal) ====================
+// ==================== DNS劫持服务（Captive Portal） ====================
+// 将所有DNS请求解析到192.168.4.1，使手机自动跳转配网页面
 static int dns_sock = -1;
 static volatile bool dns_running = false;
 static TaskHandle_t dns_task_handle = NULL;
@@ -288,7 +296,8 @@ static void dns_server_stop(void)
     }
 }
 
-// ==================== Captive Portal Redirect ====================
+// ==================== 强制跳转（Captive Portal） ====================
+// 404页面重定向到配网页，配合DNS劫持实现自动弹出
 
 static esp_err_t captive_portal_handler(httpd_req_t *req, httpd_err_code_t err)
 {
@@ -298,7 +307,7 @@ static esp_err_t captive_portal_handler(httpd_req_t *req, httpd_err_code_t err)
     return ESP_OK;
 }
 
-// ==================== WiFi Config HTTP Handlers ====================
+// ==================== WiFi配置HTTP处理 ====================
 
 static esp_err_t config_get_handler(httpd_req_t *req)
 {
@@ -439,7 +448,7 @@ static esp_err_t config_scan_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static httpd_handle_t start_config_server(void)
+httpd_handle_t start_config_server(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = 80;
@@ -477,7 +486,7 @@ void stop_config_server(void)
     }
 }
 
-// ==================== NVS WiFi Credentials ====================
+// ==================== NVS WiFi凭据存储 ====================
 
 esp_err_t save_wifi_credentials(const char *ssid, const char *password)
 {
@@ -506,7 +515,9 @@ esp_err_t load_wifi_credentials(char *ssid, size_t ssid_len, char *password, siz
     return err;
 }
 
-// ==================== WiFi Event Handler ====================
+// ==================== WiFi事件处理 ====================
+// STA模式: 连接失败5次 → 弹AP配网（仅一次）
+// AP模式: 60秒超时 → 切回STA模式
 
 void wifi_event_handler(void *arg, esp_event_base_t event_base,
                        int32_t event_id, void *event_data)

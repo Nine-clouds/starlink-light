@@ -82,8 +82,7 @@ void app_main(void)
     ESP_LOGI(TAG, "========================================");
 
     // 注册日志重定向: WARN/ERROR 同时发 MQTT
-    // TODO: 需要导出 s_original_vprintf 或在 mqtt_ha 模块中提供函数
-    // s_original_vprintf = esp_log_set_vprintf(mqtt_log_vprintf);
+    mqtt_log_init();
 
     ESP_LOGI(TAG, "System Ready");
 
@@ -209,8 +208,27 @@ void app_main(void)
  *  更新日志 (Changelog)
  * ============================================
  *
- * v1.0.6 (当前版本)
+ * v1.0.7 (当前版本)
  * ----------------
+ *
+ * 【重构】
+ *   - 单文件拆分为模块化架构:
+ *     - esp32_gateway_main.c  主程序入口，初始化与主循环
+ *     - gateway_state.c/h     全局共享状态（房间配置、MQTT/WiFi状态等）
+ *     - mqtt_ha.c/h           MQTT客户端、HA自动发现、OTA、日志上报
+ *     - uart_protocol.c/h     STC15W串口协议收发、1527映射表
+ *     - wifi_prov.c/h         WiFi配网、AP模式、HTTP配置页、DNS劫持
+ *     - config.h              设备配置（MQTT地址、版本号、WiFi凭据）
+ *   - mqtt_log_init()封装: 通过函数接口暴露日志拦截初始化，避免跨文件访问static变量
+ *
+ * 【Bug修复】
+ *   - 修复编译错误: esp_mqtt.h→mqtt_client.h、缺失FreeRTOS.h/include、重复宏定义等
+ *   - 修复uart_protocol.c中ROOM_COUNT错误的extern声明(其为宏定义)
+ *   - 修复wifi_prov.c中start_config_server的static声明与头文件不匹配
+ *   - 恢复MQTT日志拦截: mqtt_log_init()重新启用，WARN/ERROR日志重定向MQTT功能生效
+ *
+ * v1.0.6
+ * ------
  *
  * 【新增功能】
  *   - 上电智能连网: 有凭据直接连WiFi，连不上5次才弹AP；无凭据直接AP

@@ -1,8 +1,12 @@
 /**
- * UART Protocol Module - STC15W Communication
+ * UART协议模块 - STC15W通信
  *
- * Handles UART communication with STC15W microcontroller
- * Frame format: 10 18 [ADDR] [CMD] [DATA] 18 10
+ * 负责:
+ *   - STC15W串口初始化（UART1, 9600baud）
+ *   - 帧发送：带发送节流（80ms间隔，超50ms放弃等待）
+ *   - 帧接收：状态机解析，支持6字节帧和7字节帧
+ *   - 1527映射表接收：多帧解析，带超时保护
+ *   - 帧格式: 10 18 [ADDR] [CMD] [DATA] 18 10
  */
 
 #include <stdio.h>
@@ -20,7 +24,8 @@
 
 static const char *TAG = "uart_protocol";
 
-// ==================== STC15W Receive State Machine ====================
+// ==================== STC15W接收状态机 ====================
+// 状态: RX_IDLE → RX_HEAD1 → RX_HEAD2 → RX_ADDR → RX_CMD → RX_DATA/RX_TAIL1 → RX_TAIL1
 typedef enum {
     RX_IDLE, RX_HEAD1, RX_HEAD2, RX_ADDR, RX_CMD, RX_DATA, RX_TAIL1
 } rx_state_t;
@@ -30,10 +35,13 @@ static uint8_t rx_addr, rx_cmd, rx_data;
 static bool rx_has_data = false;
 static int64_t rx_frame_start_us = 0;
 
-// ==================== STC15W Send Throttling ====================
+// ==================== STC15W发送节流 ====================
+// 两次发送间隔至少80ms，等待超过50ms则放弃等待直接发送
 static int64_t last_tx_time_us = 0;
 
-// ==================== 1527 Mapping Table Receive Buffer ====================
+// ==================== 1527映射表接收缓冲 ====================
+// 映射表帧格式: 10 18 FF A1 [count] [data...] 18 10
+// 每条映射4字节: addr_h + addr_l + rf_key + dev_addr
 typedef enum {
     MAP_RX_IDLE, MAP_RX_COUNT, MAP_RX_DATA, MAP_RX_TAIL1, MAP_RX_TAIL2
 } map_rx_state_t;
@@ -46,11 +54,10 @@ static int64_t map_rx_start_us = 0;    // Mapping table receive start time
 static bool map_echo_pending = false;  // Waiting for STC15 to echo mapping
 static int64_t map_echo_sent_us = 0;   // Mapping command send time
 
-// ==================== External Declarations ====================
-// These variables are defined in gateway_state.c
+// ==================== 外部变量声明 ====================
+// 定义在 gateway_state.c 中
 extern bool room_states[];
 extern bool state_received[];
-extern int ROOM_COUNT;
 extern const uint8_t ROOM_IDS[];
 
 void stc15_uart_init(void)
@@ -253,7 +260,7 @@ void stc15_process_rx(void)
     }
 }
 
-// ==================== Getter Functions ====================
+// ==================== 映射表状态查询接口 ====================
 
 bool stc15_is_map_echo_pending(void)
 {

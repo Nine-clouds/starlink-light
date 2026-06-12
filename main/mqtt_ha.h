@@ -1,7 +1,7 @@
 /**
- * MQTT & Home Assistant Module
+ * MQTT & Home Assistant 模块
  *
- * Handles MQTT client, HA auto-discovery, command handling
+ * 负责: MQTT客户端、HA自动发现、OTA升级、日志上报
  */
 
 #ifndef MQTT_HA_H
@@ -12,10 +12,6 @@
 
 // ==================== MQTT Configuration ====================
 #define MQTT_LOG_TOPIC     "home/gateway/log"
-
-// ==================== OTA Configuration ====================
-#define DEFAULT_FW_URL     "http://your-server/ota/firmware.bin"
-#define FW_BASE_URL       "http://your-server/ota"
 
 // ==================== Function Declarations ====================
 
@@ -29,6 +25,11 @@ void mqtt_app_start(void);
  */
 void mqtt_event_handler(void *arg, esp_event_base_t event_base,
                        int32_t event_id, void *event_data);
+
+/**
+ * Initialize MQTT log interception
+ */
+void mqtt_log_init(void);
 
 /**
  * Handle MQTT message
