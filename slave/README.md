@@ -20,7 +20,18 @@ HC-12 无线接收 + 继电器控制 + 状态 EEPROM 保存。
 
 ## 部署
 
-每台从机需烧录不同地址：
+编译一次固件，用工具自动改地址批量烧录：
+
+```bash
+# GUI 版 (推荐)
+python3 tools/slave_flasher_gui.py
+# 或直接运行 tools/STC8H_Burn_Tool.exe
+
+# 命令行版
+python3 tools/slave_flasher.py slave/xxx.hex --flash COM3
+```
+
+**手动方式：**
 
 1. 打开 `starlink-slave.uvproj`（Keil C51）
 2. 修改 `DEVICE_ADDR`（第 17 行）：

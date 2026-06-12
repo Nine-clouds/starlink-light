@@ -8,6 +8,7 @@
 
 ```bash
 python3 tools/slave_flasher_gui.py
+# 或直接双击 STC8H_Burn_Tool.exe
 ```
 
 ### 打包 EXE

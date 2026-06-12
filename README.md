@@ -52,6 +52,11 @@ starlink-light/
 ├── hardware/              PCB 设计文件
 │   ├── gateway/              网关主板
 │   └── slave/                从机板
+├── tools/                 烧录工具
+│   ├── slave_flasher_gui.py  GUI 烧录 (主)
+│   ├── slave_flasher.py      CLI 烧录
+│   ├── addr_manager.py       CLI 地址管理
+│   └── STC8H_Burn_Tool.exe   打包 EXE
 ├── mapper/                1527 映射表管理服务（Python/Node.js）
 │   ├── 1527_mapper_server.py   Python版
 │   ├── 1527_mapper_server.js   Node.js版
