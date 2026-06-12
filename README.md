@@ -40,9 +40,13 @@ flowchart LR
 ```
 starlink-light/
 ├── main/                  ESP32-C3 网关固件（ESP-IDF）
-│   ├── esp32_gateway_main.c    主程序（1900+行）
-│   ├── config.example.h        配置模板
-│   └── README.md
+│   ├── esp32_gateway_main.c  主程序入口（初始化 + 主循环）
+│   ├── gateway_state.c/h     全局共享状态（房间配置、MQTT/WiFi状态）
+│   ├── mqtt_ha.c/h           MQTT客户端、HA自动发现、OTA、日志上报
+│   ├── uart_protocol.c/h     STC15W串口协议收发、1527映射表
+│   ├── wifi_prov.c/h         WiFi配网、AP模式、HTTP配置页、DNS劫持
+│   ├── config.h              设备配置（MQTT地址、版本号、WiFi凭据）
+│   └── config.example.h      配置模板
 ├── stc15w/                STC15W 桥接固件（Keil C51）
 │   ├── main.c                  主程序
 │   └── README.md

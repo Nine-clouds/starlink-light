@@ -54,10 +54,14 @@ idf.py monitor    # 查看日志
 | 7 | UART TX (→ STC15W RX) |
 | 2 | LED |
 
-## 文件
+## 模块架构
 
 | 文件 | 说明 |
 |------|------|
-| `esp32_gateway_main.c` | 全部功能（1900+行） |
-| `config.example.h` | 配置模板 |
+| `esp32_gateway_main.c` | 主程序入口（初始化 + 主循环） |
+| `gateway_state.c/h` | 全局共享状态（房间配置、MQTT/WiFi状态、查询队列） |
+| `mqtt_ha.c/h` | MQTT客户端、HA自动发现、OTA升级、日志上报 |
+| `uart_protocol.c/h` | STC15W串口协议收发、1527映射表 |
+| `wifi_prov.c/h` | WiFi配网、AP模式、HTTP配置页、DNS劫持 |
 | `config.h` | 私有配置（不入库） |
+| `config.example.h` | 配置模板 |
