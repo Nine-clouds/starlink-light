@@ -1,22 +1,23 @@
 /**
- * ESP32 智能灯网?(ESP-IDF)
+ * ESP32 智能灯控网关 (ESP-IDF)
  *
- * 架构: Home Assistant ──MQTT──?ESP32 ──UART──?STC15W ──HC-12/RF──?灯控
+ * 架构: Home Assistant ──MQTT──▶ESP32 ──UART──▶STC15W ──HC-12/RF──▶灯控
  *
- * ESP32↔STC15W 串口协议?600 baud, UART1 GPIO7/GPIO6）：
- *   命令? 10 18 [地址] [命令] 18 10         (6字节)
- *   回复? 10 18 [地址] [命令] [状态] 18 10  (7字节)
+ * ESP32↔STC15W 串口协议 (9600 baud, UART1 GPIO7/GPIO6):
+ *   命令帧: 10 18 [地址] [命令] 18 10         (6字节)
+ *   回复帧: 10 18 [地址] [命令] [状态] 18 10  (7字节)
  *
  *   地址: 0x01~0x06=房间, 0xFF=广播
- *   命令: 0x01=开? 0x02=关灯, 0x03=查询, 0x04=翻转, 0xA0=写映射表, 0xA1=读映射表
- *   状? 1=开, 0=?(仅回复帧)
+ *   命令: 0x01=开灯, 0x02=关灯, 0x03=查询, 0x04=翻转, 0xA0=写映射表, 0xA1=读映射表
+ *   状态: 1=开, 0=关 (仅回复帧)
  *
- * WiFi配网: 有凭据优先连WiFi?次失败弹AP(60s)，一次上电只弹一? *           无凭据直接开AP等待配网
+ * WiFi配网: 有凭据优先连WiFi, 5次失败弹AP(60s), 一次上电只弹一次
+ *           无凭据直接开AP等待配网
  *           访问 http://192.168.4.1 配置WiFi信息
  *
  * 远程日志: WARN/ERROR 自动上报 MQTT -> home/gateway/log
  *
- * 服务器地址等配置见 main/config.h（将 config.example.h 重命名为 config.h 后填写）
+ * 服务器地址等配置见 main/config.h (将 config.example.h 重命名为 config.h 后填写)
  */
 
 #include <stdio.h>
@@ -51,7 +52,7 @@ static const char *TAG = "gateway";
 
 // ==================== MQTT 配置 ====================
 #define MQTT_LOG_TOPIC     "home/gateway/log"
-#define CURRENT_VERSION    "v1.0.6"
+#define CURRENT_VERSION    "v1.0.7"
 
 // ==================== 房间配置 ====================
 #define ROOM_COUNT         6
@@ -59,7 +60,7 @@ static const uint8_t ROOM_IDS[ROOM_COUNT] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
 static const char *ROOM_NAMES[ROOM_COUNT] = {"晨曦", "微风", "星光", "月影", "云栖", "霁月"};
 static const char *ROOM_ENTITY_IDS[ROOM_COUNT] = {"sl_cx", "sl_wf", "sl_xg", "sl_yy", "sl_yq", "sl_jy"};
 
-// ==================== STC15W 帧协?====================
+// ==================== STC15W 帧协议 ====================
 #define FRAME_HEAD1        0x10
 #define FRAME_HEAD2        0x18
 #define FRAME_TAIL1        0x18
@@ -89,24 +90,24 @@ static const char *ROOM_ENTITY_IDS[ROOM_COUNT] = {"sl_cx", "sl_wf", "sl_xg", "sl
 #define HEARTBEAT_INTERVAL_MS   60000
 #define RX_TIMEOUT_US           50000   // 50ms
 #define TX_INTERVAL_US          80000   // 80ms
-#define MAX_TX_WAIT_US          50000   // 发送节流最大等?0ms，超限直接发
-#define STATE_PUBLISH_MIN_MS    300     // 状态上报节?300ms
-#define VERIFY_DELAY_US         1500000 // 广播命令?.5秒验
+#define MAX_TX_WAIT_US          50000   // 发送间隔最大等待50ms, 超限直接发
+#define STATE_PUBLISH_MIN_MS    300     // 状态上报间隔300ms
+#define VERIFY_DELAY_US         1500000 // 广播命令后1.5秒验证
 #define WIFI_MAX_RETRY          5
 #define WIFI_CONNECT_TIMEOUT_MS 30000
 #define PROVISIONING_TIMEOUT_S  60      // 上电后AP配网窗口60
 #define WDT_TIMEOUT_S           10      // 看门狗超时10
-// ==================== 全局状?====================
+// ==================== 全局状态 ====================
 static bool room_states[ROOM_COUNT] = {false};
 static bool state_received[ROOM_COUNT] = {false};
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 static bool mqtt_connected = false;
 static bool wifi_connected = false;
 static bool provisioning_active = false;
-static volatile bool need_provisioning = false;  // 由事件处理器设置，主循环中执
-static volatile bool provisioning_timeout = false; // AP配网窗口到时间，需切到STA
+static volatile bool need_provisioning = false;  // 由事件处理器设置，主循环中执行
+static volatile bool provisioning_timeout = false; // AP配网窗口超时，切换到STA
 static esp_timer_handle_t provisioning_timer = NULL;
-static bool ap_attempted = false;       // 已尝试过一次AP配网，不再重
+static bool ap_attempted = false;       // 已尝试过一次AP配网，不再重复
 static volatile bool in_mqtt_context = false;  // 防止日志上报时MqTT重入
 static httpd_handle_t config_server = NULL;
 
@@ -127,23 +128,23 @@ static uint8_t rx_addr, rx_cmd, rx_data;
 static bool rx_has_data = false;
 static int64_t rx_frame_start_us = 0;
 
-// STC15W 发送节
+// STC15W 发送节流
 static int64_t last_tx_time_us = 0;
 
-// 查询队列：逐房间发送QUERY，间?00ms避免HC-12半双工冲
+// 查询队列: 逐房间发送QUERY, 间隔200ms避免HC-12半双工冲突
 static int query_index = 0;
 static int64_t query_last_us = 0;
-static int query_pass = 0;  // 0=未开? 1=首轮查询, 2=补查
+static int query_pass = 0;  // 0=未开始, 1=首轮查询, 2=补查
 static volatile bool query_pending = false;  // 有查询任务待执行
 static volatile bool query_request = false;  // MQTT事件请求启动查询
 static bool verify_after_all = false;        // 广播命令后需延迟验证
 static int64_t verify_after_all_time = 0;    // 延迟验证起始时间
 #define QUERY_INTERVAL_US  200000  // 200ms
 
-// 状态上报节
+// 状态上报节流
 static int64_t last_state_publish_ms[ROOM_COUNT] = {0};
 
-// 1527映射表接收缓冲（STC15回传映射表时的状态机
+// 1527映射表接收缓冲 (STC15回传映射表时的状态机)
 typedef enum {
     MAP_RX_IDLE, MAP_RX_COUNT, MAP_RX_DATA, MAP_RX_TAIL1, MAP_RX_TAIL2
 } map_rx_state_t;
@@ -151,8 +152,9 @@ static map_rx_state_t map_rx_state = MAP_RX_IDLE;
 static uint8_t map_rx_count = 0;
 static uint8_t map_rx_buf[MAP_MAX_ENTRIES * MAP_ENTRY_SIZE];
 static uint8_t map_rx_idx = 0;
-static int64_t map_rx_start_us = 0;    // 映射表接收起始时
-static bool map_echo_pending = false;  // 正在等待STC15回传映射?static int64_t map_echo_sent_us = 0;   // 映射表命令发送时
+static int64_t map_rx_start_us = 0;    // 映射表接收起始时间
+static bool map_echo_pending = false;  // 正在等待STC15回传映射
+static int64_t map_echo_sent_us = 0;   // 映射表命令发送时间
 // ==================== 函数声明 ====================
 static void wifi_init(void);
 static void provisioning_timer_cb(void *arg);
@@ -176,7 +178,7 @@ static void publish_1527map_resp(const uint8_t *data, int count);
 static void dns_server_start(void);
 static void dns_server_stop(void);
 
-// ==================== DNS 劫持服务?(Captive Portal) ====================
+// ==================== DNS 劫持服务 (Captive Portal) ====================
 static int dns_sock = -1;
 static volatile bool dns_running = false;
 static TaskHandle_t dns_task_handle = NULL;
@@ -202,7 +204,7 @@ static void dns_task(void *pvParameters)
     int optval = 1;
     setsockopt(dns_sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
-    // 设置接收超时，以便可以检?dns_running 标志
+    // 设置接收超时，以便可以检查 dns_running 标志
     struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
     setsockopt(dns_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
@@ -215,9 +217,9 @@ static void dns_task(void *pvParameters)
         return;
     }
 
-    ESP_LOGI(TAG, "DNS劫持服务器已启动 (所有域?-> 192.168.4.1));
+    ESP_LOGI(TAG, "DNS劫持服务器已启动 (所有域名 -> 192.168.4.1)");
 
-    // AP ?IP 地址 192.168.4.1
+    // AP 的 IP 地址 192.168.4.1
     uint8_t ap_ip[4] = {192, 168, 4, 1};
 
     while (dns_running) {
@@ -237,14 +239,14 @@ static void dns_task(void *pvParameters)
 
         int recv_len = recvmsg(dns_sock, &msg, 0);
         if (recv_len < 0) {
-            // 超时或错误，检?dns_running 后继
+            // 超时或错误，检查 dns_running 后继
             if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
             if (!dns_running) break;
             continue;
         }
-        if (recv_len < 12 || recv_len > 240) continue;  // DNS 最?2字节头，最?40防止溢出
+        if (recv_len < 12 || recv_len > 240) continue;  // DNS 最小12字节头，最大240防止溢出
 
-        // 构建 DNS 响应：复用请求头 + 问题?+ 应答
+        // 构建 DNS 响应：复用请求头 + 问题 + 应答
 uint8_t tx_buf[256];
         int tx_len = recv_len;
 
@@ -260,7 +262,7 @@ uint8_t tx_buf[256];
         tx_buf[pos++] = 0xC0; tx_buf[pos++] = 0x0C;  // 指针偏移12 (问题
         tx_buf[pos++] = 0x00; tx_buf[pos++] = 0x01;  // Type A
         tx_buf[pos++] = 0x00; tx_buf[pos++] = 0x01;  // Class IN
-        tx_buf[pos++] = 0x00; tx_buf[pos++] = 0x00;  // TTL ?字节
+        tx_buf[pos++] = 0x00; tx_buf[pos++] = 0x00;  // TTL 4字节
         tx_buf[pos++] = 0x00; tx_buf[pos++] = 0x3C;  // TTL = 60s
         tx_buf[pos++] = 0x00; tx_buf[pos++] = 0x04;  // 数据长度 4
         tx_buf[pos++] = ap_ip[0];
@@ -294,7 +296,7 @@ static void dns_server_stop(void)
     if (dns_sock >= 0) {
         shutdown(dns_sock, SHUT_RDWR);
     }
-    // 等待DNS任务真正退出（最?秒）
+    // 等待DNS任务真正退出(最多1秒)
     if (dns_task_handle) {
         for (int i = 0; i < 10 && eTaskGetState(dns_task_handle) != eDeleted; i++) {
             vTaskDelay(pdMS_TO_TICKS(100));
@@ -303,9 +305,9 @@ static void dns_server_stop(void)
     }
 }
 
-// ==================== Captive Portal 重定?====================
+// ==================== Captive Portal 重定向====================
 
-// 拦截所有未匹配 URL (404)?02 重定向到配网
+// 拦截所有未匹配 URL (404), 302 重定向到配网
 static esp_err_t captive_portal_handler(httpd_req_t *req, httpd_err_code_t err)
 {
     // 302 重定向到配网首页
@@ -345,7 +347,7 @@ static esp_err_t load_wifi_credentials(char *ssid, size_t ssid_len, char *passwo
     return err;
 }
 
-// ==================== WiFi 配网 HTTP 服务?====================
+// ==================== WiFi 配网 HTTP 服务====================
 
 static const char CONFIG_HTML[] =
     "<!DOCTYPE html><html><head>"
@@ -421,7 +423,7 @@ static const char CONFIG_HTML[] =
     "<ul id='wifiList'></ul>"
     "<div class='field'>"
     "<label>WiFi 名称</label>"
-    "<input id='ssid' placeholder='点击上方列表或手动输? required>"
+    "<input id='ssid' placeholder='点击上方列表或手动输入' required>"
     "</div>"
     "<div class='field'>"
     "<label>WiFi 密码</label>"
@@ -448,7 +450,7 @@ static const char CONFIG_HTML[] =
     "function scanWifi(){"
     "var btn=document.getElementById('scanBtn');"
     "var list=document.getElementById('wifiList');"
-    "btn.disabled=true;btn.textContent='扫描?..';"
+    "btn.disabled=true;btn.textContent='扫描中..';"
     "list.style.display='block';"
     "list.innerHTML='<li class=\"loading\">正在扫描附近网络...</li>';"
     "fetch('/scan').then(r=>r.json()).then(function(data){"
@@ -573,7 +575,8 @@ static esp_err_t config_scan_handler(httpd_req_t *req)
         .channel = 0,
         .show_hidden = false,
         .scan_type = WIFI_SCAN_TYPE_ACTIVE,
-        .scan_time.active = { .min = 60, .max = 100 },  // 每信息0~100ms，快速扫?    };
+        .scan_time.active = { .min = 60, .max = 100 },
+    };
     esp_err_t err = esp_wifi_scan_start(&scan_config, true);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "WiFi扫描失败: %s", esp_err_to_name(err));
@@ -639,7 +642,8 @@ static httpd_handle_t start_config_server(void)
         return NULL;
     }
 
-    // 先注册具体路径（优先匹配置    httpd_uri_t get_uri = { .uri = "/", .method = HTTP_GET, .handler = config_get_handler };
+    // 先注册具体路径（优先匹配）
+    httpd_uri_t get_uri = { .uri = "/", .method = HTTP_GET, .handler = config_get_handler };
     httpd_uri_t post_uri = { .uri = "/save", .method = HTTP_POST, .handler = config_post_handler };
     httpd_uri_t scan_uri = { .uri = "/scan", .method = HTTP_GET, .handler = config_scan_handler };
 
@@ -647,13 +651,14 @@ static httpd_handle_t start_config_server(void)
     httpd_register_uri_handler(server, &post_uri);
     httpd_register_uri_handler(server, &scan_uri);
 
-    // 注册自定?404 处理器：拦截所有未匹配的请求，302 跳转到配网页
-    // 这样 Android/Apple/Windows 等各种连通性检?URL 都会被捕?    httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, captive_portal_handler);
+    // 注册自定义 404 处理器：拦截所有未匹配的请求，302 跳转到配网页
+    // 这样 Android/Apple/Windows 等各种连通性检查 URL 都会被捕获
+    httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, captive_portal_handler);
 
     // 启动 DNS 劫持服务
 dns_server_start();
 
-    ESP_LOGI(TAG, "HTTP配置服务?DNS已启?(Captive Portal));
+    ESP_LOGI(TAG, "HTTP配置服务+DNS已启动 (Captive Portal)");
     return server;
 }
 
@@ -681,7 +686,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             break;
         case WIFI_EVENT_STA_DISCONNECTED:
             wifi_connected = false;
-            if (provisioning_active) break;  // 已在配网模式，忽略断连事?            s_retry_num++;
+            if (provisioning_active) break;  // 已在配网模式，忽略断连事件
+            s_retry_num++;
             if (s_retry_num <= WIFI_MAX_RETRY) {
                 ESP_LOGI(TAG, "WiFi重连接.. (%d/%d)", s_retry_num, WIFI_MAX_RETRY);
                 esp_wifi_connect();
@@ -690,7 +696,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                 ap_attempted = true;
                 need_provisioning = true;
             } else {
-                ESP_LOGW(TAG, "WiFi连接失败，继续重?..");
+                ESP_LOGW(TAG, "WiFi连接失败，继续重试..");
                 s_retry_num = 0;
                 esp_wifi_connect();
             }
@@ -700,15 +706,16 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "WiFi已关联到AP");
             break;
         case WIFI_EVENT_AP_START:
-            ESP_LOGI(TAG, "配网AP已启? %s", AP_SSID);
-            // 手动设置 DHCP 服务器的 DNS 选项，让客户端使?192.168.4.1 作为 DNS
-            // （CONFIG_LWIP_DHCPS_ADD_DNS=n 阻止了内置DNS，需要手动通告?            {
+            ESP_LOGI(TAG, "配网AP已启动: %s", AP_SSID);
+            // 手动设置 DHCP 服务器的 DNS 选项，让客户端使用 192.168.4.1 作为 DNS
+            // （CONFIG_LWIP_DHCPS_ADD_DNS=n 阻止了内置DNS，需要手动通告）
+            {
                 esp_netif_t *ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
                 if (ap_netif) {
                     uint32_t dns_ip = ipaddr_addr("192.168.4.1");
                     esp_netif_dhcps_option(ap_netif, ESP_NETIF_OP_SET,
                         ESP_NETIF_DOMAIN_NAME_SERVER, &dns_ip, sizeof(dns_ip));
-                    ESP_LOGI(TAG, "DHCP DNS选项已设? 192.168.4.1");
+                    ESP_LOGI(TAG, "DHCP DNS选项已设置: 192.168.4.1");
                 }
             }
             if (!config_server) {
@@ -719,8 +726,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "有设备连接到配网AP");
             break;
         case WIFI_EVENT_AP_STOP:
-            // AP 停止时清理服务器（正常流程中 start_provisioning 已提前调?stop_config_server
-if (config_server) {
+            // AP 停止时清理服务器（正常流程中 start_provisioning 已提前调用）
+            if (config_server) {
                 stop_config_server();
             }
             break;
@@ -748,10 +755,11 @@ static void provisioning_timer_cb(void *arg)
 
 static void start_provisioning(void)
 {
-    if (provisioning_active) return;  // 已在配网模式，防止重复进?    provisioning_active = true;
+    if (provisioning_active) return;  // 已在配网模式，防止重复进入
+    provisioning_active = true;
     s_retry_num = 0;
 
-    // 停止 MQTT 客户端，防止其不断重连占?STA 接口导致扫描失败
+    // 停止 MQTT 客户端，防止其不断重连占用 STA 接口导致扫描失败
     if (mqtt_client) {
         esp_mqtt_client_stop(mqtt_client);
         esp_mqtt_client_destroy(mqtt_client);
@@ -760,17 +768,21 @@ static void start_provisioning(void)
         ESP_LOGI(TAG, "MQTT客户端已停止");
     }
 
-    // 必须先停?HTTP/DNS 服务器！
-    // esp_wifi_deinit() 会销毁网络接口和所?socket?    // 如果不先停服务器，httpd 的监?socket 会被销毁但 config_server 仍非 NULL?    // 导致 AP 重启后不会重建服务器
+    // 必须先停掉 HTTP/DNS 服务器！
+    // esp_wifi_deinit() 会销毁网络接口和所有 socket
+    // 如果不先停服务器，httpd 的监听 socket 会被销毁但 config_server 仍非 NULL
+    // 导致 AP 重启后不会重建服务器
     stop_config_server();
 
-    // 彻底去初始化WiFi驱动，确保内部状态完全清?    esp_wifi_disconnect();
+    // 彻底去初始化WiFi驱动，确保内部状态完全清除
+    esp_wifi_disconnect();
     esp_wifi_stop();
     esp_wifi_deinit();
 
     vTaskDelay(pdMS_TO_TICKS(500));
 
-    // 重新创建WiFi网络接口（esp_wifi_deinit会销毁netif?    esp_netif_create_default_wifi_sta();
+    // 重新创建WiFi网络接口（esp_wifi_deinit会销毁netif）
+    esp_netif_create_default_wifi_sta();
     esp_netif_create_default_wifi_ap();
 
     // 重新初始化WiFi驱动（全新状态）
@@ -787,14 +799,15 @@ static void start_provisioning(void)
     // APSTA 模式：AP 供手机连接，STA 用于扫描 WiFi
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &ap_config));
-    // 清空 STA 配置，确保不会自动连接    wifi_config_t sta_blank = {0};
+    // 清空 STA 配置，确保不会自动连接
+    wifi_config_t sta_blank = {0};
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &sta_blank));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "请连接WiFi '%s'（密? %s）并访问 http://192.168.4.1 进行配网", AP_SSID, AP_PASSWORD);
+    ESP_LOGI(TAG, "请连接WiFi '%s'（密码 %s）并访问 http://192.168.4.1 进行配网", AP_SSID, AP_PASSWORD);
 }
 
-// AP配网60秒超时?关闭AP，切换为STA模式重连WiFi
+// AP配网60秒超时, 关闭AP，切换为STA模式重连WiFi
 static void switch_to_sta_mode(void)
 {
     // 清理定时
@@ -854,7 +867,7 @@ static void wifi_init(void)
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
     esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
 
-    // 设置主机名，替代默认?"espressif"
+    // 设置主机名，替代默认的"espressif"
     esp_netif_set_hostname(sta_netif, "starlink-gw1");
     esp_netif_set_hostname(ap_netif, "starlink-gw1");
 
@@ -887,12 +900,12 @@ static void wifi_init(void)
     }
 }
 
-// ==================== MQTT 客户?====================
+// ==================== MQTT 客户端====================
 
 static void publish_room_state(int index)
 {
     if (!mqtt_connected || !mqtt_client) return;
-    // 节流?00ms 内不重复上报
+    // 节流: 300ms 内不重复上报
     int64_t now = esp_timer_get_time() / 1000;
     if (now - last_state_publish_ms[index] < STATE_PUBLISH_MIN_MS) return;
     last_state_publish_ms[index] = now;
@@ -1037,13 +1050,13 @@ static void handle_gateway_command(const char *payload, int len)
     }
 }
 
-// ==================== 1527映射表管?====================
+// ==================== 1527映射表管理====================
 
 // 发送映射表到STC15 (UART协议: 10 18 FF A0 [count] [entry0..n] 18 10)
 static void stc15_send_map_set(const uint8_t *entries, int count)
 {
     // 10 18 FF A0 [count] [addr_h addr_l key dev_addr]×N 18 10
-    int frame_len = 5 + count * MAP_ENTRY_SIZE + 2;  // ? + 数据 + 
+    int frame_len = 5 + count * MAP_ENTRY_SIZE + 2;  // 帧头 + 数据 + 帧尾 
     uint8_t *frame = (uint8_t *)malloc(frame_len);
     if (!frame) {
         ESP_LOGE(TAG, "映射表帧内存分配失败");
@@ -1068,7 +1081,7 @@ static void stc15_send_map_set(const uint8_t *entries, int count)
     free(frame);
 
     // SET_MAP不设置map_echo_pending，只有GET_MAP才会回传映射表数
-ESP_LOGI(TAG, "STC15W <-- 映射?(%d?", count);
+ESP_LOGI(TAG, "STC15W <-- 映射表发送 (%d条)", count);
 }
 
 // 发布映射表到MQTT (响应Web端读取请
@@ -1098,10 +1111,11 @@ static void publish_1527map_resp(const uint8_t *entries, int count)
     cJSON_free(json);
     cJSON_Delete(root);
 
-    ESP_LOGI(TAG, "已发布映射表到MQTT (%d?", count);
+    ESP_LOGI(TAG, "已发布映射表到MQTT (%d条)", count);
 }
 
-// 处理Web端发来的1527映射表命?static void handle_1527map_command(const char *payload, int len)
+// 处理Web端发来的1527映射表命令
+static void handle_1527map_command(const char *payload, int len)
 {
     cJSON *root = cJSON_ParseWithLength(payload, len);
     if (!root) {
@@ -1116,7 +1130,8 @@ static void publish_1527map_resp(const uint8_t *entries, int count)
     }
 
     if (strcmp(cmd_item->valuestring, "set_map") == 0) {
-        // 写入映射?        cJSON *data = cJSON_GetObjectItem(root, "data");
+        // 写入映射表
+        cJSON *data = cJSON_GetObjectItem(root, "data");
         if (!data || !cJSON_IsArray(data)) {
             cJSON_Delete(root);
             ESP_LOGW(TAG, "1527map set_map: data字段缺失");
@@ -1150,7 +1165,7 @@ static void publish_1527map_resp(const uint8_t *entries, int count)
             if (sscanf(addr_item->valuestring, "%04X", &addr_val) != 1 ||
                 sscanf(key_item->valuestring, "%02X", &key_val) != 1 ||
                 sscanf(dev_item->valuestring, "%02X", &dev_val) != 1) {
-                ESP_LOGW(TAG, "1527map: ?d条hex解析失败", i);
+                ESP_LOGW(TAG, "1527map: 第%d条hex解析失败", i);
                 parse_ok = false;
                 break;
             }
@@ -1169,10 +1184,11 @@ static void publish_1527map_resp(const uint8_t *entries, int count)
         free(entries);
 
     } else if (strcmp(cmd_item->valuestring, "get_map") == 0) {
-        // 请求STC15回传映射?        stc15_send_frame(ADDR_BROADCAST, CMD_GET_MAP);
+        // 请求STC15回传映射表
+        stc15_send_frame(ADDR_BROADCAST, CMD_GET_MAP);
         map_echo_pending = true;
         map_echo_sent_us = esp_timer_get_time();
-        ESP_LOGI(TAG, "已请求STC15回传映射?");
+        ESP_LOGI(TAG, "已请求STC15回传映射表");
     }
 
     cJSON_Delete(root);
@@ -1302,7 +1318,8 @@ subscribe_all();
         break;
     }
     in_mqtt_context = false;
-    flush_log_buffer();  // 发送MQTT处理期间缓存的日?}
+    flush_log_buffer();  // 发送MQTT处理期间缓存的日
+}
 
 static void mqtt_app_start(void)
 {
@@ -1334,13 +1351,14 @@ static void mqtt_app_start(void)
 
 // ==================== MQTT 日志上报 ====================
 #define LOG_BUF_SIZE        256
-#define LOG_RING_COUNT      8       // MQTT上下文内最多缓?条日
+#define LOG_RING_COUNT      8       // MQTT上下文内最多缓存 8 条日志
 static vprintf_like_t s_original_vprintf = NULL;
 static char log_ring[LOG_RING_COUNT][LOG_BUF_SIZE];
 static volatile int log_ring_head = 0;  // 写入位置
 static volatile int log_ring_count = 0; // 当前缓存条数
 
-// 将缓存日志发到MQTT（在MQTT上下文外调用?static void flush_log_buffer(void)
+// 将缓存日志发到MQTT（在MQTT上下文外调用）
+static void flush_log_buffer(void)
 {
     if (!mqtt_client || !mqtt_connected) {
         log_ring_count = 0;
@@ -1359,19 +1377,20 @@ static int mqtt_log_vprintf(const char *fmt, va_list args)
     va_list args_copy;
     va_copy(args_copy, args);
 
-    // 先走原始串口输出，确保本地也能看到日?    int ret = 0;
+    // 先走原始串口输出，确保本地也能看到日志
+    int ret = 0;
     if (s_original_vprintf) {
         ret = s_original_vprintf(fmt, args);
     }
 
-    // 仅上?WARN ?ERROR 级别
+    // 仅上报 WARN / ERROR 级别
     char level = fmt[0];
     if (level != 'W' && level != 'E') {
         va_end(args_copy);
         return ret;
     }
 
-    // MQTT 未连接?丢弃
+    // MQTT 未连接时丢弃
     if (!mqtt_client || !mqtt_connected) {
         va_end(args_copy);
         return ret;
@@ -1379,9 +1398,10 @@ static int mqtt_log_vprintf(const char *fmt, va_list args)
 
     char *buf;
     if (in_mqtt_context) {
-        // MQTT上下文内 ?缓存，等空闲时上
+        // MQTT上下文内: 缓存，等空闲时上报
 if (log_ring_count >= LOG_RING_COUNT) {
-            // 缓存满，丢弃最旧的一?            log_ring_count--;
+            // 缓存满，丢弃最旧的一条
+            log_ring_count--;
         }
         buf = log_ring[log_ring_head];
         log_ring_head = (log_ring_head + 1) % LOG_RING_COUNT;
@@ -1396,7 +1416,7 @@ if (log_ring_count >= LOG_RING_COUNT) {
 
     if (len <= 0 || len >= LOG_BUF_SIZE) return ret;
 
-    // 非MQTT上下??直接发
+    // 非MQTT上下文: 直接发送
 if (!in_mqtt_context) {
         esp_mqtt_client_publish(mqtt_client, MQTT_LOG_TOPIC, buf, 0, 1, 0);
     }
@@ -1467,9 +1487,9 @@ static void stc15_process_rx(void)
     for (int i = 0; i < len; i++) {
         uint8_t dat = buf[i];
 
-        // 映射表接收模式优先处理（跳过普通状态机，避免数据字?x10/0x18干扰
+        // 映射表接收模式优先处理（跳过普通状态机，避免数据字节 0x10/0x18 干扰
 if (map_rx_state != MAP_RX_IDLE) {
-            // 映射表接收超时保护（最?2条?字节=128字节 + 帧头??150ms @9600baud
+            // 映射表接收超时保护（最多 32条 * 4字节 = 128字节 + 帧头尾, ~150ms @9600baud
 if (esp_timer_get_time() - map_rx_start_us > 200000) {
                 ESP_LOGW(TAG, "映射表接收超时，重置");
                 map_rx_state = MAP_RX_IDLE;
@@ -1483,9 +1503,10 @@ if (esp_timer_get_time() - map_rx_start_us > 200000) {
                 if (map_rx_count == 0) {
                     map_rx_state = MAP_RX_TAIL1;
                 } else if (map_rx_count > MAP_MAX_ENTRIES) {
-                    ESP_LOGW(TAG, "映射表条数超时 %d", map_rx_count);
+                    ESP_LOGW(TAG, "映射表条数超限 %d", map_rx_count);
                     map_rx_state = MAP_RX_IDLE;
-                    rx_state = RX_IDLE;  // 重置普通帧状态机，防止后续字节误?                } else {
+                    rx_state = RX_IDLE;  // 重置普通帧状态机，防止后续字节误判
+                } else {
                     map_rx_state = MAP_RX_DATA;
                 }
                 break;
@@ -1499,20 +1520,21 @@ if (esp_timer_get_time() - map_rx_start_us > 200000) {
                 if (dat == FRAME_TAIL1) {
                     map_rx_state = MAP_RX_TAIL2;
                 } else {
-                    ESP_LOGW(TAG, "映射表帧TAIL1不匹? %02X", dat);
+                    ESP_LOGW(TAG, "映射表帧TAIL1不匹配: %02X", dat);
                     map_rx_state = MAP_RX_IDLE;
                 }
                 break;
             case MAP_RX_TAIL2:
                 if (dat == FRAME_TAIL2) {
-                    ESP_LOGI(TAG, "STC15W --> 映射表回?(%d?", map_rx_count);
+                    ESP_LOGI(TAG, "STC15W --> 映射表回传 (%d条)", map_rx_count);
                     publish_1527map_resp(map_rx_buf, map_rx_count);
                 } else {
-                    ESP_LOGW(TAG, "映射表帧TAIL2不匹? %02X", dat);
+                    ESP_LOGW(TAG, "映射表帧TAIL2不匹配: %02X", dat);
                 }
                 map_rx_state = MAP_RX_IDLE;
                 map_echo_pending = false;
-                rx_state = RX_IDLE;  // 防止帧尾0x10被误判为新帧?                break;
+                rx_state = RX_IDLE;  // 防止帧尾0x10被误判为新帧头
+                break;
             default:
                 map_rx_state = MAP_RX_IDLE;
                 break;
@@ -1577,7 +1599,7 @@ if (rx_state != RX_IDLE) {
             if (dat == FRAME_TAIL2) {
                 if (rx_has_data) {
                     bool new_state = (rx_data == 0x01);
-                    ESP_LOGD(TAG, "STC15W --> 10 18 %02X %02X %02X 18 10  (房间%02X 状?%s)",
+                    ESP_LOGD(TAG, "STC15W --> 10 18 %02X %02X %02X 18 10  (房间%02X 状态:%s)",
                              rx_addr, rx_cmd, rx_data, rx_addr, new_state ? "ON" : "OFF");
                     for (int j = 0; j < ROOM_COUNT; j++) {
                         if (ROOM_IDS[j] == rx_addr) {
@@ -1590,7 +1612,7 @@ if (rx_state != RX_IDLE) {
                         }
                     }
                 } else {
-                    ESP_LOGD(TAG, "STC15W --> 10 18 %02X %02X 18 10  (6字节?", rx_addr, rx_cmd);
+                    ESP_LOGD(TAG, "STC15W --> 10 18 %02X %02X 18 10  (6字节帧)", rx_addr, rx_cmd);
                 }
             }
             rx_state = RX_IDLE;
@@ -1635,7 +1657,8 @@ static void ota_task(void *pvParameter)
 
     esp_err_t ret = esp_https_ota(&ota_config);
 
-    // 恢复看门狗为10秒超时    wdt_config.timeout_ms = WDT_TIMEOUT_S * 1000;
+    // 恢复看门狗为10秒超时
+    wdt_config.timeout_ms = WDT_TIMEOUT_S * 1000;
     esp_task_wdt_reconfigure(&wdt_config);
 
     if (ret == ESP_OK) {
@@ -1663,7 +1686,7 @@ static void start_ota_update(const char *url)
     }
 }
 
-// ==================== 主程?====================
+// ==================== 主程序====================
 
 void app_main(void)
 {
@@ -1678,8 +1701,8 @@ void app_main(void)
     // 初始化STC15W UART
     stc15_uart_init();
 
-    // 初始化WiFi（连接成功后自动启动MQTT
-wifi_init();
+    // 初始化WiFi（连接成功后自动启动MQTT）
+    wifi_init();
 
     // LED指示
     gpio_set_direction(GPIO_NUM_2, GPIO_MODE_OUTPUT);
@@ -1698,7 +1721,7 @@ wifi_init();
         ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
         ESP_LOGI(TAG, "看门狗已启用 (%ds)", WDT_TIMEOUT_S);
     } else {
-        ESP_LOGW(TAG, "看门狗初始化失败: %s，跳过, esp_err_to_name(wdt_ret));
+        ESP_LOGW(TAG, "看门狗初始化失败: %s，跳过", esp_err_to_name(wdt_ret));
     }
 
     ESP_LOGI(TAG, "========================================");
@@ -1709,13 +1732,14 @@ wifi_init();
     ESP_LOGI(TAG, "MQTT: %s", MQTT_BROKER_URI);
     ESP_LOGI(TAG, "========================================");
 
-    // 注册日志重定向：WARN/ERROR 同时?MQTT
+    // 注册日志重定向: WARN/ERROR 同时发 MQTT
     s_original_vprintf = esp_log_set_vprintf(mqtt_log_vprintf);
 
     ESP_LOGI(TAG, "系统就绪");
 
-    // 主循?    while (1) {
-        // 运行时WiFi连接失败，启动AP配网?0秒窗口）
+    // 主循环
+    while (1) {
+        // 运行时WiFi连接失败，启动AP配网(60秒窗口)
         if (need_provisioning) {
             need_provisioning = false;
             start_provisioning();
@@ -1758,16 +1782,18 @@ if (verify_after_all && (esp_timer_get_time() - verify_after_all_time >= VERIFY_
 if (query_pending && mqtt_connected) {
             if (query_index == 0 && query_pass == 0) {
                 query_pass = 1;
-                ESP_LOGI(TAG, "开始查询所有房间状?..");
+                ESP_LOGI(TAG, "开始查询所有房间状态..");
                 query_last_us = esp_timer_get_time();
             }
             if ((esp_timer_get_time() - query_last_us) >= QUERY_INTERVAL_US) {
                 if (query_pass == 1 && query_index < ROOM_COUNT) {
-                    // 首轮：逐房间查?                    stc15_send_frame(ROOM_IDS[query_index], CMD_QUERY);
+                    // 首轮：逐房间查询（已禁用，仅用于验证）
+                    // stc15_send_frame(ROOM_IDS[query_index], CMD_QUERY);
                     query_index++;
                     query_last_us = esp_timer_get_time();
                 } else if (query_pass == 1 && query_index >= ROOM_COUNT) {
-                    // 首轮完成，检查未回复的房?                    query_pass = 2;
+                    // 首轮完成，检查未回复的房间，进入补查
+                    query_pass = 2;
                     query_index = 0;
                     bool any_missing = false;
                     for (int i = 0; i < ROOM_COUNT; i++) {
@@ -1786,7 +1812,8 @@ if (query_pending && mqtt_connected) {
                         query_last_us = esp_timer_get_time();
                     }
                 } else if (query_pass == 2) {
-                    // 补查：找到下一个未收到回复的房?                    bool found = false;
+                    // 补查：找到下一个未收到回复的房间
+                    bool found = false;
                     while (query_index < ROOM_COUNT) {
                         if (!state_received[query_index]) {
                             stc15_send_frame(ROOM_IDS[query_index], CMD_QUERY);
@@ -1809,7 +1836,7 @@ if (query_pending && mqtt_connected) {
 
         stc15_process_rx();
 
-        // 映射表回传等待超时保护（STC15处理+回传?00ms，预?00ms
+        // 映射表回传等待超时保护（STC15处理+回传 ~200ms，预留 500ms
 if (map_echo_pending && (esp_timer_get_time() - map_echo_sent_us > 500000)) {
             map_echo_pending = false;
             ESP_LOGW(TAG, "映射表回传等待超时");
@@ -1831,40 +1858,36 @@ if (map_echo_pending && (esp_timer_get_time() - map_echo_sent_us > 500000)) {
 }
 
 /*
-============================================
-  更新日志
-============================================
-
-v1.0.6
-
-品牌重命?  项目?              dpp-enrollee ?starlink_gw1
-  HA设备?            HC-12 智能灯网??星联灯控
-  HA型号               ESP32+STC15W Multi-Room ?SL-GW1
-  设备ID               esp32_c3_gateway ?starlink_gw1
-  房间?              房间一~??晨曦/微风/星光/月影/云栖/霁月
-  Entity ID            gw2_switch* ?sl_cx/sl_wf/sl_xg/sl_yy/sl_yq/sl_jy
-  WiFi主机?          espressif ?starlink-gw1
-
-新增功能
-  上电智能连网        有凭据直接连WiFi，连不上5次才弹AP；无凭据直接AP
-  AP仅一?           一次上电只开一次AP(60s窗口)，之后无限重连不弹AP
-  ALLON/ALLOFF乐观更新 广播后立即更新状态上报MQTT，HA秒响?  ALLON/ALLOFF延迟验证 广播?.5s自动查询真实状态纠?  单房间乐观更?      点按后HA即时响应，等STC15W回复确认
-  远程日志上报         WARN/ERROR自动发MQTT，HA自动发现"星联灯控日志"
-                       MQTT上下文内日志缓存 延迟上报，无重入风险
-
-优化
-  UART引脚对调         TX→GPIO7, RX→GPIO6
-  移除上电自动查询     MQTT连接后不再主动查房间状?  精简日志             帧收发日志改为DEBUG级别，默认静?  WiFi扫描加?        每信息0~100ms
-  HTTP服务器优?      socket 7?2 + LRU淘汰
-  心跳初值修?        连接后等60s才首?
-Bug修复
-  配网esp_wifi_deinit后未重建netif ?AP网页/DNS失效
-  OTA xTaskCreate失败 ?内存泄漏
-  MQTT遗嘱msg_len=0 ?显式指定
-  WiFi扫描ESP_ERROR_CHECK ?崩溃风险
-  provisioning_timer_cb 重复定义
-  注释过时/引脚号不匹配
-  MQTT日志重入保护 ?加in_mqtt_context标志+环形缓冲
-
-当前版本: v1.0.6
-*/
+ * ============================================
+ *  更新日志 (Changelog)
+ * ============================================
+ *
+ * v1.0.6 (当前版本)
+ * ----------------
+ *
+ * 【新增功能】
+ *   - 上电智能连网: 有凭据直接连WiFi，连不上5次才弹AP；无凭据直接AP
+ *   - AP仅一次: 一次上电只开一次AP(60s窗口)，之后无限重连不弹AP
+ *   - ALLON/ALLOFF乐观更新: 广播后立即更新状态上报MQTT，HA秒响应
+ *   - ALLON/ALLOFF延迟验证: 广播后1.5s自动查询真实状态纠错
+ *   - 单房间乐观更新: 点按后HA即时响应，等STC15W回复确认
+ *   - 远程日志上报: WARN/ERROR自动发MQTT，HA自动发现"星联灯控日志"
+ *                    MQTT上下文内日志缓存，延迟上报，无重入风险
+ *
+ * 【优化】
+ *   - 移除上电自动查询: MQTT连接后不再主动查房间状态
+ *   - 精简日志: 帧收发日志改为DEBUG级别，默认静默
+ *   - WiFi扫描加速: 每信道60~100ms
+ *   - HTTP服务器优化: socket 7->12 + LRU淘汰
+ *   - 心跳初值修正: 连接后等60s才首报
+ *
+ * 【Bug修复】
+ *   - 配网esp_wifi_deinit后未重建netif -> AP网页/DNS失效
+ *   - OTA xTaskCreate失败 -> 内存泄漏
+ *   - MQTT遗嘱msg_len=0 -> 显式指定
+ *   - WiFi扫描ESP_ERROR_CHECK -> 崩溃风险
+ *   - provisioning_timer_cb 重复定义
+ *   - 注释过时/引脚号不匹配
+ *   - MQTT日志重入保护 -> 加in_mqtt_context标志+环形缓冲
+ *
+ */
