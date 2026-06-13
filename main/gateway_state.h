@@ -36,7 +36,7 @@ extern bool provisioning_active;
 extern volatile bool need_provisioning;
 extern volatile bool provisioning_timeout;
 extern esp_timer_handle_t provisioning_timer;
-extern bool ap_attempted;
+extern volatile bool ap_attempted;
 extern volatile bool in_mqtt_context;
 extern httpd_handle_t config_server;
 

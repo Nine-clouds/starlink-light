@@ -502,6 +502,19 @@ esp_err_t save_wifi_credentials(const char *ssid, const char *password)
     return err;
 }
 
+esp_err_t erase_wifi_credentials(void)
+{
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) return err;
+    nvs_erase_key(handle, NVS_KEY_SSID);
+    nvs_erase_key(handle, NVS_KEY_PASS);
+    nvs_commit(handle);
+    nvs_close(handle);
+    ESP_LOGI(TAG, "WiFi credentials erased from NVS");
+    return ESP_OK;
+}
+
 esp_err_t load_wifi_credentials(char *ssid, size_t ssid_len, char *password, size_t pass_len)
 {
     nvs_handle_t handle;
@@ -549,6 +562,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base,
             break;
         case WIFI_EVENT_STA_CONNECTED:
             s_retry_num = 0;
+            ap_attempted = true;  /* 连接过一次WiFi后，永不自动弹AP */
             ESP_LOGI(TAG, "WiFi associated to AP");
             break;
         case WIFI_EVENT_AP_START:
@@ -611,17 +625,8 @@ void start_provisioning(void)
 
     stop_config_server();
 
-    esp_wifi_disconnect();
+    /* 只stop WiFi，不deinit，不销毁netif */
     esp_wifi_stop();
-    esp_wifi_deinit();
-
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    esp_netif_create_default_wifi_sta();
-    esp_netif_create_default_wifi_ap();
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     wifi_config_t ap_config = {0};
     strlcpy((char *)ap_config.ap.ssid, AP_SSID, sizeof(ap_config.ap.ssid));
@@ -630,9 +635,10 @@ void start_provisioning(void)
     ap_config.ap.authmode = WIFI_AUTH_WPA2_PSK;
     strlcpy((char *)ap_config.ap.password, AP_PASSWORD, sizeof(ap_config.ap.password));
 
+    wifi_config_t sta_blank = {0};
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &ap_config));
-    wifi_config_t sta_blank = {0};
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &sta_blank));
     ESP_ERROR_CHECK(esp_wifi_start());
 
@@ -658,41 +664,33 @@ void switch_to_sta_mode(void)
 
     stop_config_server();
 
-    esp_wifi_disconnect();
+    /* 只stop WiFi，不deinit，不销毁netif */
     esp_wifi_stop();
-    esp_wifi_deinit();
-
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
-    esp_netif_set_hostname(sta_netif, "starlink-gw1");
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     wifi_config_t wifi_config = {0};
     strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
     strlcpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
 
+    s_retry_num = 0;
+    provisioning_active = false;
+    provisioning_timeout = false;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
-
-    provisioning_active = false;
-    provisioning_timeout = false;
 }
 
 void wifi_init(void)
 {
-    s_wifi_event_group = xEventGroupCreate();
+    if (!s_wifi_event_group) {
+        s_wifi_event_group = xEventGroupCreate();
+    }
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
-    esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
+    esp_netif_create_default_wifi_ap();
 
     esp_netif_set_hostname(sta_netif, "starlink-gw1");
-    esp_netif_set_hostname(ap_netif, "starlink-gw1");
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));

@@ -31,7 +31,7 @@ bool provisioning_active = false;
 volatile bool need_provisioning = false;
 volatile bool provisioning_timeout = false;
 esp_timer_handle_t provisioning_timer = NULL;
-bool ap_attempted = false;
+volatile bool ap_attempted = false;
 volatile bool in_mqtt_context = false;
 httpd_handle_t config_server = NULL;
 

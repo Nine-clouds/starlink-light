@@ -24,6 +24,7 @@
 #include "mqtt_ha.h"
 #include "gateway_state.h"
 #include "uart_protocol.h"
+#include "wifi_prov.h"
 #include "config.h"
 
 static const char *TAG = "mqtt_ha";
@@ -371,6 +372,15 @@ void handle_gateway_command(const char *payload, int len)
         }
         verify_after_all = true;
         verify_after_all_time = esp_timer_get_time();
+    } else if (len >= 9 && strncmp(payload, "PROVISION", 9) == 0) {
+        ESP_LOGI(TAG, "Remote provisioning triggered via MQTT");
+        ap_attempted = false;
+        need_provisioning = true;
+    } else if (len >= 10 && strncmp(payload, "WIFI_ERASE", 10) == 0) {
+        ESP_LOGI(TAG, "WiFi erase and re-provision triggered via MQTT");
+        erase_wifi_credentials();
+        ap_attempted = false;
+        need_provisioning = true;
     }
 }
 

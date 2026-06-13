@@ -52,6 +52,11 @@ esp_err_t save_wifi_credentials(const char *ssid, const char *password);
 esp_err_t load_wifi_credentials(char *ssid, size_t ssid_len, char *password, size_t pass_len);
 
 /**
+ * Erase WiFi credentials from NVS
+ */
+esp_err_t erase_wifi_credentials(void);
+
+/**
  * Start config HTTP server
  */
 httpd_handle_t start_config_server(void);

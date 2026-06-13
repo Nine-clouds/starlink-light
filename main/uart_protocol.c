@@ -20,6 +20,7 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "uart_protocol.h"
+#include "mqtt_ha.h"
 #include "gateway_state.h"
 
 static const char *TAG = "uart_protocol";
@@ -162,8 +163,7 @@ void stc15_process_rx(void)
             case MAP_RX_TAIL2:
                 if (dat == FRAME_TAIL2) {
                     ESP_LOGI(TAG, "STC15W --> Mapping table echoed (%d entries)", map_rx_count);
-                    // TODO: Publish mapping response to MQTT
-                    // publish_1527map_resp(map_rx_buf, map_rx_count);
+                    publish_1527map_resp(map_rx_buf, map_rx_count);
                 } else {
                     ESP_LOGW(TAG, "Mapping table frame TAIL2 mismatch: %02X", dat);
                 }
